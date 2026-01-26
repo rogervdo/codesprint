@@ -1,0 +1,332 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+    createSession,
+    getSession,
+    getSessions,
+    updateSession,
+    deleteSession,
+    clearSessions,
+    getSessionStats,
+    getRecentSessions,
+    getSessionsBySnippet,
+    type SessionRecord,
+    type CreateSessionInput,
+} from "../session-history";
+
+const mockLocalStorage = (() => {
+    let store: Record<string, string> = {};
+    return {
+        getItem: vi.fn((key: string) => store[key] ?? null),
+        setItem: vi.fn((key: string, value: string) => {
+            store[key] = value;
+        }),
+        removeItem: vi.fn((key: string) => {
+            delete store[key];
+        }),
+        clear: vi.fn(() => {
+            store = {};
+        }),
+        get length() {
+            return Object.keys(store).length;
+        },
+        key: vi.fn((index: number) => Object.keys(store)[index] ?? null),
+    };
+})();
+
+vi.stubGlobal("window", { localStorage: mockLocalStorage });
+
+let uuidCounter = 0;
+vi.stubGlobal("crypto", { randomUUID: vi.fn(() => `test-uuid-${++uuidCounter}`) });
+
+function createMockInput(overrides: Partial<CreateSessionInput> = {}): CreateSessionInput {
+    return {
+        snippetId: "test-snippet",
+        language: "javascript",
+        lengthCategory: "medium",
+        difficulty: "easy",
+        wpm: 60,
+        rawWpm: 65,
+        accuracy: 0.95,
+        elapsedMs: 30000,
+        totalKeystrokes: 300,
+        correctKeystrokes: 285,
+        errorCount: 5,
+        history: [
+            { time: 1, wpm: 55, raw: 60, errors: 1, burst: 70 },
+            { time: 2, wpm: 58, raw: 63, errors: 2, burst: 65 },
+        ],
+        ...overrides,
+    };
+}
+
+describe("session-history", () => {
+    beforeEach(() => {
+        mockLocalStorage.clear();
+        uuidCounter = 0;
+        vi.clearAllMocks();
+    });
+
+    describe("createSession", () => {
+        it("should create a session with generated id and date", () => {
+            const input = createMockInput();
+            const result = createSession(input);
+
+            expect(result).not.toBeNull();
+            expect(result?.id).toMatch(/^test-uuid-/);
+            expect(result?.date).toBeDefined();
+            expect(result?.snippetId).toBe(input.snippetId);
+            expect(result?.wpm).toBe(input.wpm);
+        });
+
+        it("should store the session in localStorage", () => {
+            const input = createMockInput();
+            createSession(input);
+
+            expect(mockLocalStorage.setItem).toHaveBeenCalled();
+            const stored = JSON.parse(mockLocalStorage.setItem.mock.calls[0][1]);
+            expect(stored).toHaveLength(1);
+            expect(stored[0].snippetId).toBe(input.snippetId);
+        });
+
+        it("should prepend new sessions (most recent first)", () => {
+            createSession(createMockInput({ snippetId: "first" }));
+            createSession(createMockInput({ snippetId: "second" }));
+
+            const sessions = getSessions();
+            expect(sessions[0].snippetId).toBe("second");
+            expect(sessions[1].snippetId).toBe("first");
+        });
+    });
+
+    describe("getSession", () => {
+        it("should retrieve a session by id", () => {
+            const created = createSession(createMockInput());
+            const retrieved = getSession(created!.id);
+
+            expect(retrieved).not.toBeNull();
+            expect(retrieved?.id).toBe(created?.id);
+        });
+
+        it("should return null for non-existent id", () => {
+            createSession(createMockInput());
+            const result = getSession("non-existent-id");
+
+            expect(result).toBeNull();
+        });
+    });
+
+    describe("getSessions", () => {
+        it("should return all sessions when no filters provided", () => {
+            createSession(createMockInput({ language: "javascript" }));
+            createSession(createMockInput({ language: "python" }));
+
+            const sessions = getSessions();
+            expect(sessions).toHaveLength(2);
+        });
+
+        it("should filter by language", () => {
+            createSession(createMockInput({ language: "javascript" }));
+            createSession(createMockInput({ language: "python" }));
+            createSession(createMockInput({ language: "javascript" }));
+
+            const sessions = getSessions({ language: "javascript" });
+            expect(sessions).toHaveLength(2);
+            expect(sessions.every((s) => s.language === "javascript")).toBe(true);
+        });
+
+        it("should filter by lengthCategory", () => {
+            createSession(createMockInput({ lengthCategory: "short" }));
+            createSession(createMockInput({ lengthCategory: "medium" }));
+            createSession(createMockInput({ lengthCategory: "short" }));
+
+            const sessions = getSessions({ lengthCategory: "short" });
+            expect(sessions).toHaveLength(2);
+        });
+
+        it("should filter by difficulty", () => {
+            createSession(createMockInput({ difficulty: "easy" }));
+            createSession(createMockInput({ difficulty: "hard" }));
+
+            const sessions = getSessions({ difficulty: "hard" });
+            expect(sessions).toHaveLength(1);
+        });
+
+        it("should filter by snippetId", () => {
+            createSession(createMockInput({ snippetId: "snippet-a" }));
+            createSession(createMockInput({ snippetId: "snippet-b" }));
+            createSession(createMockInput({ snippetId: "snippet-a" }));
+
+            const sessions = getSessions({ snippetId: "snippet-a" });
+            expect(sessions).toHaveLength(2);
+        });
+
+        it("should apply limit and offset", () => {
+            for (let i = 0; i < 5; i++) {
+                createSession(createMockInput({ wpm: i * 10 }));
+            }
+
+            const sessions = getSessions({ limit: 2, offset: 1 });
+            expect(sessions).toHaveLength(2);
+            expect(sessions[0].wpm).toBe(30); // Most recent is wpm=40, offset=1 gives wpm=30
+            expect(sessions[1].wpm).toBe(20);
+        });
+
+        it("should combine multiple filters", () => {
+            createSession(createMockInput({ language: "javascript", difficulty: "easy" }));
+            createSession(createMockInput({ language: "javascript", difficulty: "hard" }));
+            createSession(createMockInput({ language: "python", difficulty: "easy" }));
+
+            const sessions = getSessions({ language: "javascript", difficulty: "easy" });
+            expect(sessions).toHaveLength(1);
+        });
+    });
+
+    describe("updateSession", () => {
+        it("should update an existing session", () => {
+            const created = createSession(createMockInput({ wpm: 60 }));
+            const updated = updateSession(created!.id, { wpm: 70 });
+
+            expect(updated).not.toBeNull();
+            expect(updated?.wpm).toBe(70);
+            expect(updated?.id).toBe(created?.id);
+            expect(updated?.date).toBe(created?.date);
+        });
+
+        it("should return null for non-existent id", () => {
+            createSession(createMockInput());
+            const result = updateSession("non-existent-id", { wpm: 100 });
+
+            expect(result).toBeNull();
+        });
+
+        it("should not allow updating id or date", () => {
+            const created = createSession(createMockInput());
+            // TypeScript prevents this at compile time, but we test runtime behavior
+            const updated = updateSession(created!.id, { wpm: 100 } as Partial<SessionRecord>);
+
+            expect(updated?.id).toBe(created?.id);
+            expect(updated?.date).toBe(created?.date);
+        });
+
+        it("should persist the update to storage", () => {
+            const created = createSession(createMockInput({ wpm: 60 }));
+            updateSession(created!.id, { wpm: 70 });
+
+            const retrieved = getSession(created!.id);
+            expect(retrieved?.wpm).toBe(70);
+        });
+    });
+
+    describe("deleteSession", () => {
+        it("should delete an existing session", () => {
+            const created = createSession(createMockInput());
+            const result = deleteSession(created!.id);
+
+            expect(result).toBe(true);
+            expect(getSession(created!.id)).toBeNull();
+        });
+
+        it("should return false for non-existent id", () => {
+            createSession(createMockInput());
+            const result = deleteSession("non-existent-id");
+
+            expect(result).toBe(false);
+        });
+
+        it("should not affect other sessions", () => {
+            const session1 = createSession(createMockInput({ snippetId: "keep" }));
+            const session2 = createSession(createMockInput({ snippetId: "delete" }));
+
+            deleteSession(session2!.id);
+
+            expect(getSession(session1!.id)).not.toBeNull();
+            expect(getSessions()).toHaveLength(1);
+        });
+    });
+
+    describe("clearSessions", () => {
+        it("should remove all sessions", () => {
+            createSession(createMockInput());
+            createSession(createMockInput());
+            createSession(createMockInput());
+
+            clearSessions();
+
+            expect(getSessions()).toHaveLength(0);
+            expect(mockLocalStorage.removeItem).toHaveBeenCalled();
+        });
+    });
+
+    describe("getSessionStats", () => {
+        it("should return zero stats for empty history", () => {
+            const stats = getSessionStats();
+
+            expect(stats.totalSessions).toBe(0);
+            expect(stats.averageWpm).toBe(0);
+            expect(stats.averageAccuracy).toBe(0);
+            expect(stats.bestWpm).toBe(0);
+            expect(stats.totalTimeMs).toBe(0);
+        });
+
+        it("should calculate correct statistics", () => {
+            createSession(createMockInput({ wpm: 60, accuracy: 0.9, elapsedMs: 30000 }));
+            createSession(createMockInput({ wpm: 80, accuracy: 0.95, elapsedMs: 25000 }));
+            createSession(createMockInput({ wpm: 70, accuracy: 0.92, elapsedMs: 28000 }));
+
+            const stats = getSessionStats();
+
+            expect(stats.totalSessions).toBe(3);
+            expect(stats.averageWpm).toBe(70); // (60 + 80 + 70) / 3
+            expect(stats.averageAccuracy).toBeCloseTo(0.923, 2); // (0.9 + 0.95 + 0.92) / 3
+            expect(stats.bestWpm).toBe(80);
+            expect(stats.totalTimeMs).toBe(83000);
+        });
+
+        it("should respect filters", () => {
+            createSession(createMockInput({ language: "javascript", wpm: 60 }));
+            createSession(createMockInput({ language: "python", wpm: 100 }));
+
+            const stats = getSessionStats({ language: "javascript" });
+
+            expect(stats.totalSessions).toBe(1);
+            expect(stats.averageWpm).toBe(60);
+            expect(stats.bestWpm).toBe(60);
+        });
+    });
+
+    describe("getRecentSessions", () => {
+        it("should return the most recent sessions", () => {
+            for (let i = 0; i < 15; i++) {
+                createSession(createMockInput({ wpm: i }));
+            }
+
+            const recent = getRecentSessions(5);
+
+            expect(recent).toHaveLength(5);
+            expect(recent[0].wpm).toBe(14); // Most recent
+            expect(recent[4].wpm).toBe(10);
+        });
+
+        it("should use default count of 10", () => {
+            for (let i = 0; i < 15; i++) {
+                createSession(createMockInput());
+            }
+
+            const recent = getRecentSessions();
+            expect(recent).toHaveLength(10);
+        });
+    });
+
+    describe("getSessionsBySnippet", () => {
+        it("should return all sessions for a specific snippet", () => {
+            createSession(createMockInput({ snippetId: "target" }));
+            createSession(createMockInput({ snippetId: "other" }));
+            createSession(createMockInput({ snippetId: "target" }));
+
+            const sessions = getSessionsBySnippet("target");
+
+            expect(sessions).toHaveLength(2);
+            expect(sessions.every((s) => s.snippetId === "target")).toBe(true);
+        });
+    });
+});
