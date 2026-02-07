@@ -42,3 +42,15 @@ next-env.d.ts
 
 # local agent docs
 AGENTS.md
+
+# local tooling
+.ralphy/
+hookgen/
+logs/
+
+# separate project / planning artifacts
+codesprint/
+Codesprint_PRD/
+CodeSprint_PRD.*
+prd.md
+IMPROVEMENTS.md
