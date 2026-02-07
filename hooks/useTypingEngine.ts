@@ -5,7 +5,8 @@ import { usePreferences } from "@/lib/preferences";
 
 export type Phase = "idle" | "countdown" | "running" | "finished";
 
-type ErrorEntry = { expected: string; got: string; index: number };
+export type ErrorEntry = { expected: string; got: string; index: number };
+export type HistoryEntry = { time: number; wpm: number; raw: number; errors: number; burst: number };
 
 function normalizeWhitespace(ch: string) {
     return ch === "\r" ? "\n" : ch;
@@ -54,7 +55,7 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
     }, [snippet]);
 
     // History tracking
-    const [history, setHistory] = useState<Array<{ time: number; wpm: number; raw: number; errors: number; burst: number }>>([]);
+    const [history, setHistory] = useState<HistoryEntry[]>([]);
 
     // Timer tick & History update
     useEffect(() => {

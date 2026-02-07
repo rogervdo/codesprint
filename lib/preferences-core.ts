@@ -156,7 +156,7 @@ function createMinimalTheme(base: string, accent: string, overrides: Partial<The
         headerBg: withAlpha(headerBase, 0.84),
         headerBorder: withAlpha(borderBlend, 0.32),
         headerText: overrides?.text || accent, // Use text color for header text, allowing overrides
-        headerTextSubtle: accentAlpha(0.7),
+        headerTextSubtle: accentAlpha(0.85),
         overlay: withAlpha(overlayBlend, 0.18),
         focusRing: accentAlpha(0.9),
         terminalBg: terminalBase,

@@ -1,0 +1,261 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { Phase } from "./useFocusManagement";
+
+export interface UseKeyboardShortcutsProps {
+    phase: Phase;
+    vimMode: boolean;
+    problemCount: number;
+    engineHandleKeyDown: (e: KeyboardEvent) => void;
+    onReset: () => void;
+    onNextProblem: () => void;
+    onStartEngine: () => void;
+    enableEditorFocus: () => void;
+    focusEditor: () => void;
+    setVimMode: (enabled: boolean) => void;
+    setShowLiveStatsDuringRun: (enabled: boolean) => void;
+    showLiveStatsDuringRun: boolean;
+    clearAutoAdvance: () => void;
+}
+
+export interface UseKeyboardShortcutsReturn {
+    /** Whether Vim preview mode is active */
+    isVimPreviewing: boolean;
+    /** Set Vim preview mode */
+    setIsVimPreviewing: (previewing: boolean) => void;
+    /** Enter Vim preview mode */
+    beginVimPreview: () => void;
+    /** Exit Vim preview mode */
+    exitVimPreview: () => void;
+}
+
+/**
+ * Hook to manage global keyboard shortcuts and event listeners
+ * Extracted from TypingSession.tsx keyboard handling logic
+ *
+ * Manages a 5-level keyboard event hierarchy:
+ * 1. Global Escape Handling (Highest Priority)
+ * 2. Vim Toggle (v key, not while running)
+ * 3. Vim Preview Mode
+ * 4. Global Shortcuts (Non-Vim)
+ * 5. Pass to Engine (Typing)
+ */
+export function useKeyboardShortcuts({
+    phase,
+    vimMode,
+    problemCount,
+    engineHandleKeyDown,
+    onReset,
+    onNextProblem,
+    onStartEngine,
+    enableEditorFocus,
+    focusEditor,
+    setVimMode,
+    setShowLiveStatsDuringRun,
+    showLiveStatsDuringRun,
+    clearAutoAdvance,
+}: UseKeyboardShortcutsProps): UseKeyboardShortcutsReturn {
+    const [isVimPreviewing, setIsVimPreviewing] = useState(false);
+
+    const beginVimPreview = useCallback(() => {
+        if (!vimMode) {
+            setVimMode(true);
+        }
+        setIsVimPreviewing(true);
+        enableEditorFocus();
+        setTimeout(() => focusEditor(), 40);
+    }, [enableEditorFocus, vimMode, setVimMode, focusEditor]);
+
+    const exitVimPreview = useCallback(() => {
+        setIsVimPreviewing(false);
+    }, []);
+
+    // Auto-exit vim preview when running starts
+    useEffect(() => {
+        if (phase === "running" && isVimPreviewing) {
+            setIsVimPreviewing(false);
+        }
+    }, [phase, isVimPreviewing]);
+
+    // Main keyboard event handler
+    useEffect(() => {
+        function onKeyDown(e: KeyboardEvent) {
+            const allowVimHandling = vimMode;
+            const keyLower = e.key.toLowerCase();
+
+            // 1. Global Escape Handling (Highest Priority)
+            if (e.key === "Escape") {
+                if (isVimPreviewing) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setVimMode(false);
+                    exitVimPreview();
+                    return;
+                }
+                if (phase === "finished" && problemCount > 1) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enableEditorFocus();
+                    onNextProblem();
+                    return;
+                }
+                if (phase === "running" || phase === "countdown") {
+                    clearAutoAdvance();
+                    onReset();
+
+                    // If Vim mode is enabled, go back to preview instead of just resetting
+                    if (vimMode) {
+                        beginVimPreview();
+                        // Allow propagation so monaco-vim sees Esc and exits Insert mode
+                        return;
+                    }
+
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            // 2. Vim Toggle (v) - Allow toggling ON/OFF when not running
+            if (!e.metaKey && !e.ctrlKey && !e.altKey && keyLower === "v" && phase !== "running") {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isVimPreviewing || vimMode) {
+                    setVimMode(false);
+                    exitVimPreview();
+                } else {
+                    beginVimPreview();
+                }
+                return;
+            }
+
+            // 3. Vim Preview Mode - Delegate to Monaco, ignore Engine
+            if (isVimPreviewing) {
+                // Handle 'i' to start typing
+                if (keyLower === "i" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // Allow propagation so monaco-vim enters Insert mode
+                    setVimMode(true);
+                    setIsVimPreviewing(false);
+                    enableEditorFocus();
+                    onReset();
+                    onStartEngine();
+                    focusEditor();
+                    return;
+                }
+
+                // Handle shortcuts that should work in preview
+                if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+                    if (keyLower === "r") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setVimMode(false);
+                        exitVimPreview();
+                        enableEditorFocus();
+                        onReset();
+                        onStartEngine();
+                        focusEditor();
+                        return;
+                    }
+                    if (keyLower === "n" || keyLower === "q") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        enableEditorFocus();
+                        onNextProblem();
+                        return;
+                    }
+                }
+                return;
+            }
+
+            // 4. Global Shortcuts (Non-Vim)
+            if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+                // Handle Tab and Space to go to next test when finished
+                if (phase === "finished" && problemCount > 1) {
+                    if (e.key === "Tab" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        enableEditorFocus();
+                        onNextProblem();
+                        return;
+                    }
+                }
+                if (keyLower === "r" && phase !== "running") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enableEditorFocus();
+                    onReset();
+                    onStartEngine();
+                    focusEditor();
+                    return;
+                }
+                if ((keyLower === "n" || keyLower === "q") && phase !== "running") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enableEditorFocus();
+                    onNextProblem();
+                    return;
+                }
+                if (keyLower === "l") {
+                    if (phase !== "running") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowLiveStatsDuringRun(!showLiveStatsDuringRun);
+                        return;
+                    }
+                }
+                if (keyLower === "p" && phase !== "running") {
+                    // Allow propagation to AppShell for preferences drawer
+                    return;
+                }
+            }
+
+            // 5. Pass to Engine (Typing)
+            if (allowVimHandling) {
+                enableEditorFocus();
+                engineHandleKeyDown(e);
+                return;
+            }
+
+            // Standard typing
+            enableEditorFocus();
+            engineHandleKeyDown(e);
+        }
+
+        function onPaste(e: ClipboardEvent) {
+            e.preventDefault();
+        }
+
+        document.addEventListener("keydown", onKeyDown, true);
+        window.addEventListener("paste", onPaste);
+
+        return () => {
+            document.removeEventListener("keydown", onKeyDown, true);
+            window.removeEventListener("paste", onPaste);
+        };
+    }, [
+        phase,
+        showLiveStatsDuringRun,
+        vimMode,
+        setShowLiveStatsDuringRun,
+        setVimMode,
+        onNextProblem,
+        enableEditorFocus,
+        onReset,
+        onStartEngine,
+        engineHandleKeyDown,
+        beginVimPreview,
+        exitVimPreview,
+        isVimPreviewing,
+        problemCount,
+        focusEditor,
+        clearAutoAdvance,
+    ]);
+
+    return {
+        isVimPreviewing,
+        setIsVimPreviewing,
+        beginVimPreview,
+        exitVimPreview,
+    };
+}
