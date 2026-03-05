@@ -1,7 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useSessionControls } from "../useSessionControls";
-import { CURATED_SNIPPETS_LIST } from "@/lib/snippets";
+import { CURATED_SNIPPETS_LIST, type Snippet } from "@/lib/snippets";
+
+function makeSnippet(overrides: Partial<Snippet> = {}): Snippet {
+    return {
+        id: "python:base",
+        problemId: "python:base",
+        title: "Base",
+        content: "def solve(values: list[int]) -> int:\n    return sum(values)\n",
+        language: "python",
+        lengthCategory: "short",
+        difficulty: "easy",
+        lines: 2,
+        ...overrides,
+    };
+}
 
 describe("useSessionControls", () => {
     const mockResetEngine = vi.fn();
@@ -61,5 +75,63 @@ describe("useSessionControls", () => {
             result.current.setLengthPreference("medium");
         });
         expect(result.current.lengthPreference).toBe("medium");
+    });
+
+    it("prefers a higher-variance problem when initializing", () => {
+        const snippets: Snippet[] = [
+            makeSnippet({
+                id: "python:pandas-a",
+                problemId: "python:pandas-a",
+                title: "Pandas A",
+                content: "import pandas as pd\n\ndef pandas_a(df: pd.DataFrame) -> pd.DataFrame:\n",
+                lines: 3,
+            }),
+            makeSnippet({
+                id: "python:full-a",
+                problemId: "python:full-a",
+                title: "Full A",
+                content: "def full_a(values: list[int]) -> int:\n    total = 0\n    for value in values:\n        total += value\n    return total\n",
+                lines: 5,
+            }),
+        ];
+
+        const { result } = renderControls(snippets);
+        expect(result.current.problemId).toBe("python:full-a");
+    });
+
+    it("skips low-variance pandas stubs when choosing next problem if alternatives exist", () => {
+        const snippets: Snippet[] = [
+            makeSnippet({
+                id: "python:pandas-a",
+                problemId: "python:pandas-a",
+                title: "Pandas A",
+                content: "import pandas as pd\n\ndef pandas_a(df: pd.DataFrame) -> pd.DataFrame:\n",
+                lines: 3,
+            }),
+            makeSnippet({
+                id: "python:full-a",
+                problemId: "python:full-a",
+                title: "Full A",
+                content: "def full_a(values: list[int]) -> int:\n    return sum(values)\n",
+                lines: 2,
+            }),
+            makeSnippet({
+                id: "python:full-b",
+                problemId: "python:full-b",
+                title: "Full B",
+                content: "def full_b(values: list[int]) -> int:\n    count = 0\n    for value in values:\n        count += value\n    return count\n",
+                lines: 5,
+            }),
+        ];
+
+        const { result } = renderControls(snippets);
+        const initialProblemId = result.current.problemId;
+
+        act(() => {
+            result.current.handleNextProblem();
+        });
+
+        expect(result.current.problemId).not.toBe("python:pandas-a");
+        expect(result.current.problemId).not.toBe(initialProblemId);
     });
 });

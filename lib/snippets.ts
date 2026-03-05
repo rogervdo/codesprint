@@ -38,6 +38,8 @@ type SnippetFilters = {
     length?: SnippetLength;
 };
 
+export type SnippetVarianceTag = "python-pandas-signature" | "signature-only" | "full";
+
 type DatasetSnippet = {
     id?: string;
     lang?: string;
@@ -71,6 +73,8 @@ const LENGTH_ORDER: Record<SnippetLength, number> = {
     medium: 1,
     long: 2,
 };
+
+const PYTHON_PANDAS_SIGNATURE_PATTERN = /^import pandas as pd\s*\n\s*def [a-zA-Z_]\w*\([^)]*\)\s*->\s*pd\.DataFrame:\s*\n$/;
 
 function isSkeletal(content: string, language: SupportedLanguage): boolean {
     const lines = content.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
@@ -226,6 +230,44 @@ class Batch(Generic[T]):
                 batch = []
         if batch:
             yield batch`,
+    }),
+    defineSnippet({
+        id: "py-interval-index-short",
+        language: "python",
+        difficulty: "easy",
+        title: "Interval index",
+        sourceSlug: "py-interval-index",
+        lengthCategory: "short",
+        content: `from bisect import bisect_left
+
+def find_slot(bounds: list[int], value: int) -> int:
+    if not bounds:
+        return 0
+    index = bisect_left(bounds, value)
+    return max(0, min(index, len(bounds) - 1))`,
+    }),
+    defineSnippet({
+        id: "py-interval-index-medium",
+        language: "python",
+        difficulty: "medium",
+        title: "Interval index (with cache)",
+        sourceSlug: "py-interval-index",
+        lengthCategory: "medium",
+        content: `from bisect import bisect_left
+from dataclasses import dataclass, field
+
+@dataclass
+class IntervalIndex:
+    bounds: list[int]
+    _cache: dict[int, int] = field(default_factory=dict)
+
+    def locate(self, value: int) -> int:
+        if value in self._cache:
+            return self._cache[value]
+        idx = bisect_left(self.bounds, value)
+        idx = max(0, min(idx, len(self.bounds) - 1))
+        self._cache[value] = idx
+        return idx`,
     }),
     defineSnippet({
         id: "java-logger-short",
@@ -641,6 +683,73 @@ export function getSnippet(snippets: Snippet[], language: SupportedLanguage, fil
     return preferred ?? fallback;
 }
 
+export function getSnippetVarianceTag(snippet: Snippet): SnippetVarianceTag {
+    if (
+        snippet.language === "python" &&
+        snippet.lengthCategory === "short" &&
+        PYTHON_PANDAS_SIGNATURE_PATTERN.test(snippet.content)
+    ) {
+        return "python-pandas-signature";
+    }
+    if (isSignatureOnlySnippet(snippet)) {
+        return "signature-only";
+    }
+    return "full";
+}
+
+export function getSnippetVarietyScore(snippet: Snippet): number {
+    const varianceTag = getSnippetVarianceTag(snippet);
+    let score = Math.min(snippet.lines, 40) / 4;
+
+    if (varianceTag === "python-pandas-signature") {
+        score -= 12;
+    } else if (varianceTag === "signature-only") {
+        score -= 6;
+    } else {
+        score += 4;
+    }
+
+    if (snippet.lengthCategory === "medium") score += 1;
+    if (snippet.lengthCategory === "long") score += 2;
+    if (snippet.difficulty === "medium") score += 1;
+    if (snippet.difficulty === "hard") score += 2;
+
+    return score;
+}
+
+function isSignatureOnlySnippet(snippet: Snippet): boolean {
+    if (snippet.lines > 6) return false;
+    const nonEmpty = snippet.content
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+    if (nonEmpty.length === 0) return true;
+
+    return nonEmpty.every((line) => {
+        if (
+            line.startsWith("import ") ||
+            line.startsWith("from ") ||
+            line.startsWith("#include ") ||
+            line.startsWith("package ") ||
+            line.startsWith("@")
+        ) {
+            return true;
+        }
+
+        if (
+            /^def [a-zA-Z_]\w*\(.*\):$/.test(line) ||
+            /^class [a-zA-Z_]\w*(\([^)]*\))?:$/.test(line) ||
+            /^(public|private|protected)\s+.*\)\s*\{?$/.test(line) ||
+            /^template\s*</.test(line)
+        ) {
+            return true;
+        }
+
+        return false;
+    });
+}
+
 function normalizeContent(content: string): string {
     const normalized = content.replace(/\r\n/g, "\n");
     const cleaned = condenseBlankRuns(normalized);
@@ -720,4 +829,3 @@ function isSupportedLanguage(value: unknown): value is SupportedLanguage {
 function isDifficulty(value: unknown): value is Difficulty {
     return value === "easy" || value === "medium" || value === "hard";
 }
-

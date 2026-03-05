@@ -5,6 +5,8 @@ import {
     getProblems,
     getProblemSnippets,
     getSnippet,
+    getSnippetVarietyScore,
+    getSnippetVarianceTag,
     CURATED_SNIPPETS_LIST,
     type Snippet,
 } from "../snippets";
@@ -232,5 +234,47 @@ describe("getSnippet", () => {
     it("falls back to any snippet if length filter has no match", () => {
         const snippet = getSnippet(CURATED_SNIPPETS_LIST, "javascript");
         expect(snippet).toBeDefined();
+    });
+});
+
+describe("snippet variance helpers", () => {
+    it("marks short pandas signatures as low variance", () => {
+        const snippet: Snippet = {
+            id: "python:pandas-one",
+            problemId: "python:pandas-one",
+            title: "Pandas One",
+            content: "import pandas as pd\n\ndef foo(df: pd.DataFrame) -> pd.DataFrame:\n",
+            language: "python",
+            lengthCategory: "short",
+            difficulty: "easy",
+            lines: 3,
+        };
+
+        expect(getSnippetVarianceTag(snippet)).toBe("python-pandas-signature");
+    });
+
+    it("scores full snippets above low-variance stubs", () => {
+        const full: Snippet = {
+            id: "python:full",
+            problemId: "python:full",
+            title: "Full",
+            content: "def total(values: list[int]) -> int:\n    return sum(values)\n",
+            language: "python",
+            lengthCategory: "short",
+            difficulty: "easy",
+            lines: 2,
+        };
+        const pandas: Snippet = {
+            id: "python:pandas",
+            problemId: "python:pandas",
+            title: "Pandas",
+            content: "import pandas as pd\n\ndef foo(df: pd.DataFrame) -> pd.DataFrame:\n",
+            language: "python",
+            lengthCategory: "short",
+            difficulty: "easy",
+            lines: 3,
+        };
+
+        expect(getSnippetVarietyScore(full)).toBeGreaterThan(getSnippetVarietyScore(pandas));
     });
 });
