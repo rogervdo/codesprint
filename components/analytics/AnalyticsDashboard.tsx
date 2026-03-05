@@ -443,8 +443,6 @@ export default function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps)
             p={{ base: 4, md: 6 }}
             w="100%"
             maxW="900px"
-            maxH="85vh"
-            overflowY="auto"
         >
             <Stack gap={6}>
                 {/* Header */}
@@ -468,10 +466,11 @@ export default function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps)
                             background: "var(--surface)",
                             color: "var(--text)",
                             cursor: "pointer",
+                            fontFamily: "inherit",
                         }}
                     >
                         {TIME_RANGE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
+                            <option key={option.value} value={option.value} style={{ background: "var(--bg)", color: "var(--text)" }}>
                                 {option.label}
                             </option>
                         ))}

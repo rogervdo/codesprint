@@ -23,6 +23,7 @@ import {
     SwitchRoot,
     Text,
 } from "@chakra-ui/react";
+import { useCallback, useRef, useState } from "react";
 import {
     DEFAULT_PREFERENCES,
     type SurfaceStyle,
@@ -30,6 +31,7 @@ import {
     usePreferences,
 } from "@/lib/preferences";
 import { ThemeSelector } from "@/components/ThemeSelector";
+import { exportSessions, importSessions, downloadFile, type ImportResult } from "@/lib/export";
 
 type PreferencesDrawerProps = {
     isOpen: boolean;
@@ -47,8 +49,9 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
         setSurfaceStyle,
         setInterfaceMode,
         setVimMode,
-        setDebugGapBuffer,
         setSyntaxHighlighting,
+        setSpacedRepetitionEnabled,
+        setAdaptiveDifficultyEnabled,
     } = usePreferences();
 
     const syntaxHighlightingOptions: Array<{ value: SyntaxHighlightingMode; label: string }> = [
@@ -66,6 +69,9 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
         { value: "terminal", label: "Terminal layout", helper: "Minimal framing with progress bar" },
     ];
 
+    const [importStatus, setImportStatus] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     const resetToDefaults = () => {
         setTheme(DEFAULT_PREFERENCES.theme);
         setFontSize(DEFAULT_PREFERENCES.fontSize);
@@ -73,7 +79,52 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
         setCountdownEnabled(DEFAULT_PREFERENCES.countdownEnabled);
         setShowLiveStatsDuringRun(DEFAULT_PREFERENCES.showLiveStatsDuringRun);
         setSurfaceStyle(DEFAULT_PREFERENCES.surfaceStyle);
+        setVimMode(DEFAULT_PREFERENCES.vimMode);
+        setSyntaxHighlighting(DEFAULT_PREFERENCES.syntaxHighlighting);
+        setInterfaceMode(DEFAULT_PREFERENCES.interfaceMode);
+        setSpacedRepetitionEnabled(DEFAULT_PREFERENCES.spacedRepetitionEnabled);
+        setAdaptiveDifficultyEnabled(DEFAULT_PREFERENCES.adaptiveDifficultyEnabled);
     };
+
+    const handleExportJSON = useCallback(async () => {
+        try {
+            const data = await exportSessions("json");
+            const date = new Date().toISOString().slice(0, 10);
+            downloadFile(data, `codesprint-${date}.json`, "application/json");
+        } catch {
+            setImportStatus("Export failed");
+        }
+    }, []);
+
+    const handleExportCSV = useCallback(async () => {
+        try {
+            const data = await exportSessions("csv");
+            const date = new Date().toISOString().slice(0, 10);
+            downloadFile(data, `codesprint-${date}.csv`, "text/csv");
+        } catch {
+            setImportStatus("Export failed");
+        }
+    }, []);
+
+    const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const result: ImportResult = await importSessions(text);
+            setImportStatus(
+                `Imported ${result.imported} sessions` +
+                (result.duplicates > 0 ? `, ${result.duplicates} duplicates skipped` : "") +
+                (result.invalid > 0 ? `, ${result.invalid} invalid` : "")
+            );
+        } catch {
+            setImportStatus("Import failed - invalid file");
+        }
+
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    }, []);
 
     return (
         <DrawerRoot
@@ -88,7 +139,7 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
         >
             <DrawerBackdrop backdropFilter="blur(6px)" />
             <DrawerPositioner>
-                <DrawerContent bg="rgba(15, 15, 15, 0.9)" borderLeft="1px solid var(--border)" backdropFilter="blur(12px)">
+                <DrawerContent bg="var(--header-bg)" borderLeft="1px solid var(--border)" backdropFilter="blur(12px)">
                     <CloseButton mt={2} position="absolute" top={2} right={2} onClick={onClose} />
                     <DrawerHeader borderBottomWidth="1px" borderColor="var(--border)">
                         Preferences
@@ -170,7 +221,6 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
                                     <SwitchRoot
                                         checked={preferences.countdownEnabled}
                                         onCheckedChange={({ checked }) => setCountdownEnabled(checked)}
-                                        colorPalette="yellow"
                                         display="inline-flex"
                                         alignItems="center"
                                     >
@@ -190,7 +240,6 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
                                     <SwitchRoot
                                         checked={preferences.vimMode}
                                         onCheckedChange={({ checked }) => setVimMode(checked)}
-                                        colorPalette="yellow"
                                         display="inline-flex"
                                         alignItems="center"
                                     >
@@ -230,16 +279,34 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
 
                             <Box>
                                 <Text fontSize="sm" fontWeight={600} mb={2}>
-                                    Debug: Gap Buffer
+                                    Spaced Repetition
                                 </Text>
                                 <HStack justify="space-between" align="center">
                                     <Text fontSize="xs" color="var(--text-subtle)">
-                                        Visualize memory layout
+                                        Smart review scheduling based on your performance
                                     </Text>
                                     <SwitchRoot
-                                        checked={preferences.debugGapBuffer}
-                                        onCheckedChange={({ checked }) => setDebugGapBuffer(checked)}
-                                        colorPalette="yellow"
+                                        checked={preferences.spacedRepetitionEnabled}
+                                        onCheckedChange={({ checked }) => setSpacedRepetitionEnabled(checked)}
+                                        display="inline-flex"
+                                        alignItems="center"
+                                    >
+                                        <SwitchControl />
+                                        <SwitchHiddenInput />
+                                    </SwitchRoot>
+                                </HStack>
+                            </Box>
+                            <Box>
+                                <Text fontSize="sm" fontWeight={600} mb={2}>
+                                    Adaptive Difficulty
+                                </Text>
+                                <HStack justify="space-between" align="center">
+                                    <Text fontSize="xs" color="var(--text-subtle)">
+                                        Auto-adjust difficulty to match your skill level
+                                    </Text>
+                                    <SwitchRoot
+                                        checked={preferences.adaptiveDifficultyEnabled}
+                                        onCheckedChange={({ checked }) => setAdaptiveDifficultyEnabled(checked)}
                                         display="inline-flex"
                                         alignItems="center"
                                     >
@@ -260,7 +327,6 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
                                     <SwitchRoot
                                         checked={preferences.showLiveStatsDuringRun}
                                         onCheckedChange={({ checked }) => setShowLiveStatsDuringRun(checked)}
-                                        colorPalette="yellow"
                                         display="inline-flex"
                                         alignItems="center"
                                     >
@@ -337,6 +403,62 @@ export function PreferencesDrawer({ isOpen, onClose }: PreferencesDrawerProps) {
                                         );
                                     })}
                                 </Flex>
+                            </Box>
+
+                            <Box borderBottom="1px solid var(--border)" />
+
+                            <Box>
+                                <Text fontSize="sm" fontWeight={600} mb={3}>
+                                    Data
+                                </Text>
+                                <Stack gap={2}>
+                                    <Flex gap={2}>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            borderColor="var(--border)"
+                                            color="var(--text-subtle)"
+                                            _hover={{ bg: "var(--surface-hover)", color: "var(--text)" }}
+                                            onClick={handleExportJSON}
+                                            flex={1}
+                                        >
+                                            Export JSON
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            borderColor="var(--border)"
+                                            color="var(--text-subtle)"
+                                            _hover={{ bg: "var(--surface-hover)", color: "var(--text)" }}
+                                            onClick={handleExportCSV}
+                                            flex={1}
+                                        >
+                                            Export CSV
+                                        </Button>
+                                    </Flex>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        borderColor="var(--border)"
+                                        color="var(--text-subtle)"
+                                        _hover={{ bg: "var(--surface-hover)", color: "var(--text)" }}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        Import Data
+                                    </Button>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept=".json"
+                                        onChange={handleImport}
+                                        style={{ display: "none" }}
+                                    />
+                                    {importStatus && (
+                                        <Text fontSize="xs" color="var(--accent)">
+                                            {importStatus}
+                                        </Text>
+                                    )}
+                                </Stack>
                             </Box>
 
                             <Box borderBottom="1px solid var(--border)" />

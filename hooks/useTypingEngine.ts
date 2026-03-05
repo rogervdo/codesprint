@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { computeMetrics, type Metrics } from "@/lib/scoring";
+import { computeMetrics, computePatternScore, type Metrics } from "@/lib/scoring";
 import type { Snippet } from "@/lib/snippets";
+import { tokenize } from "@/lib/tokenizer";
 import { usePreferences } from "@/lib/preferences";
 
 export type Phase = "idle" | "countdown" | "running" | "finished";
@@ -46,9 +47,10 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
         startTimeRef.current = startTime;
     }, [startTime]);
 
-    useEffect(() => {
-        cursorIndexRef.current = cursorIndex;
-    }, [cursorIndex]);
+    // NOTE: cursorIndexRef is updated SYNCHRONOUSLY inside handleKeyDown
+    // (not via useEffect) to avoid a race condition where rapid keystrokes
+    // read a stale ref before React's deferred effects run.
+    // The reset() callback also updates it synchronously.
 
     useEffect(() => {
         snippetRef.current = snippet;
@@ -128,7 +130,9 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
     }, [phase]);
 
     const reset = useCallback(() => {
-        console.log("Engine reset called");
+        phaseRef.current = "idle";
+        cursorIndexRef.current = 0;
+        startTimeRef.current = null;
         setPhase("idle");
         setCountdown(null);
         setCursorIndex(0);
@@ -306,6 +310,7 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 effectiveTyped += auto.advanced;
 
                 // Apply updates for auto-advance
+                cursorIndexRef.current = effectiveIndex;
                 setCursorIndex(effectiveIndex);
                 setTotalTypedChars(prev => prev + auto.advanced);
                 setWrongChars(prev => {
@@ -331,7 +336,8 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             }
 
             if (advanced > 0) {
-                setCursorIndex(i => i + advanced);
+                cursorIndexRef.current = effectiveIndex + advanced;
+                setCursorIndex(cursorIndexRef.current);
                 setTotalTypedChars(prev => prev + advanced);
                 // Manual tab is a correct action
                 setCorrectKeystrokes(prev => prev + 1);
@@ -347,7 +353,8 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             // 3. Manual Tab (literal tab character)
             const expected = snippetRef.current.content[effectiveIndex];
             if (expected === "\t") {
-                setCursorIndex(i => i + 1);
+                cursorIndexRef.current = effectiveIndex + 1;
+                setCursorIndex(cursorIndexRef.current);
                 setTotalTypedChars(prev => prev + 1);
                 setCorrectKeystrokes(prev => prev + 1);
                 setWrongChars(prev => {
@@ -401,7 +408,8 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             if (currentCursor === 0) return;
 
             const targetIndex = currentCursor - 1;
-            setCursorIndex(i => Math.max(0, i - 1));
+            cursorIndexRef.current = targetIndex;
+            setCursorIndex(targetIndex);
             setWrongChars(prev => {
                 const next = new Set(prev);
                 next.delete(targetIndex);
@@ -415,23 +423,15 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
 
         // If auto-advance happened
         if (advanced > 0) {
+            cursorIndexRef.current = currentIndex;
             setCursorIndex(currentIndex);
             setTotalTypedChars(prev => prev + advanced);
             setWrongChars(prev => {
                 if (prev.size === 0) return prev;
                 const next = new Set(prev);
-                for (let i = cursorIndexRef.current; i < currentIndex; i++) next.delete(i);
+                for (let i = currentIndex - advanced; i < currentIndex; i++) next.delete(i);
                 return next;
             });
-            // We continue to process the key press at the NEW index?
-            // Original code: "const { nextIndex: currentIndex } = autoAdvanceIndentationIfAllowed(cursorIndex);"
-            // It DID NOT return early. It used the new index as the target for the typed character.
-            // But wait, `autoAdvanceIndentationIfAllowed` in original code had side effects:
-            // "setCursorIndex(target); ... return { advanced, nextIndex: target };"
-            // And then: "const { nextIndex: currentIndex } = autoAdvanceIndentationIfAllowed(cursorIndex);"
-            // If it advanced, it updated state.
-            // Then it continued: "const expected = snippet.content[currentIndex];"
-            // So yes, it advances past whitespace, THEN checks the key against the character AFTER the whitespace.
         }
 
         const expected = snippetRef.current.content[currentIndex];
@@ -442,7 +442,9 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
         const got = e.key === "Enter" ? "\n" : e.key;
         const ok = normalizeWhitespace(got) === normalizeWhitespace(expected);
 
-        setCursorIndex(i => i + 1);
+        const newCursor = currentIndex + 1;
+        cursorIndexRef.current = newCursor;
+        setCursorIndex(newCursor);
         setTotalTypedChars(prev => prev + 1);
 
         if (ok) {
@@ -455,8 +457,7 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             });
 
             // Check for completion immediately after a correct keystroke
-            // We use currentIndex + 1 because we just advanced the cursor
-            const nextIdx = currentIndex + 1;
+            const nextIdx = newCursor;
             const snippetContent = snippetRef.current.content;
             const isEnd = nextIdx >= snippetContent.length;
             const isTrailingNewline = nextIdx === snippetContent.length - 1 && snippetContent[nextIdx] === "\n";
@@ -492,10 +493,12 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
         cursorIndex: 0,
         wrongChars: new Set<number>(),
         snippetContent: snippet.content,
+        snippetRef: snippet,
         startTime: null as number | null,
         totalTypedChars: 0,
         totalKeystrokes: 0,
         correctKeystrokes: 0,
+        errorLog: [] as ErrorEntry[],
     });
 
     // Keep ref in sync (doesn't trigger re-renders)
@@ -504,16 +507,18 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             cursorIndex,
             wrongChars,
             snippetContent: snippet.content,
+            snippetRef: snippet,
             startTime,
             totalTypedChars,
             totalKeystrokes,
             correctKeystrokes,
+            errorLog,
         };
-    }, [cursorIndex, wrongChars, snippet.content, startTime, totalTypedChars, totalKeystrokes, correctKeystrokes]);
+    }, [cursorIndex, wrongChars, snippet, startTime, totalTypedChars, totalKeystrokes, correctKeystrokes, errorLog]);
 
     // Helper to calculate and publish metrics (only when called)
     const calculateAndPublishMetrics = useCallback(() => {
-        const { cursorIndex: idx, wrongChars: errs, snippetContent, startTime: start, totalTypedChars: typed, totalKeystrokes: strokes, correctKeystrokes: correct } = metricsInputRef.current;
+        const { cursorIndex: idx, wrongChars: errs, snippetContent, snippetRef: snip, startTime: start, totalTypedChars: typed, totalKeystrokes: strokes, correctKeystrokes: correct, errorLog: errors } = metricsInputRef.current;
 
         // Calculate getPerfectWordChars
         let perfectChars = 0;
@@ -550,6 +555,17 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             totalKeystrokes: strokes,
             correctKeystrokes: correct,
         });
+
+        // Compute pattern score using tokens
+        const tokens = snip.tokens ?? tokenize(snippetContent, snip.language);
+        const errorPositions = errors.map((e) => e.index);
+        metrics.patternScore = computePatternScore({
+            errorPositions,
+            tokens,
+            contentLength: snippetContent.length,
+            language: snip.language,
+        });
+
         setPublishedMetrics(metrics);
     }, []);
 
@@ -586,6 +602,8 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
         errorLog,
         caretErrorActive,
         history,
+        totalKeystrokes,
+        correctKeystrokes,
         reset,
         start,
         handleKeyDown,

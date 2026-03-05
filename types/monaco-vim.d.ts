@@ -1,3 +1,7 @@
-declare module 'monaco-vim' {
-    export function initVimMode(editor: any, statusNode?: HTMLElement | null): any;
+declare module "monaco-vim" {
+    export type VimModeController = {
+        dispose: () => void;
+    };
+
+    export function initVimMode(editor: unknown, statusNode?: HTMLElement | null): VimModeController;
 }

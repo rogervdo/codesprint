@@ -42,8 +42,8 @@ export function useSnippets(currentLanguage: SupportedLanguage = "python") {
         }
 
         try {
-            const module = await languageImports[lang]();
-            const loaded: Snippet[] = module.default;
+            const importedSnippets = await languageImports[lang]();
+            const loaded: Snippet[] = importedSnippets.default;
             snippetsByLanguage.current[lang] = loaded;
             loadedLanguages.current[lang] = true;
             return loaded;
@@ -65,7 +65,7 @@ export function useSnippets(currentLanguage: SupportedLanguage = "python") {
 
         async function loadProgressively() {
             // 1. Load current language first (fast path - user can start immediately)
-            const currentLangSnippets = await loadLanguage(currentLanguage);
+            await loadLanguage(currentLanguage);
             if (!mounted) return;
             
             // Update with current language snippets immediately

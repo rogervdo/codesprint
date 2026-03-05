@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Flex } from "@chakra-ui/react";
+import { Button, Flex, Text } from "@chakra-ui/react";
 import {
     TooltipContent,
     TooltipPositioner,
@@ -13,6 +13,7 @@ import { getControlsMotion, getStartButtonMotion } from "@/lib/motion-config";
 import type { SupportedLanguage } from "@/lib/snippets";
 import type { LengthFilter } from "@/hooks/useSessionControls";
 import type { Phase } from "@/hooks/useFocusManagement";
+import type { Difficulty } from "@/lib/snippets";
 
 export type SurfaceStyle = "panel" | "immersive";
 
@@ -39,6 +40,10 @@ export interface SessionControlBarProps {
     isTerminalMode: boolean;
     /** Whether user prefers reduced motion */
     prefersReducedMotion: boolean;
+    /** Number of snippets due for review */
+    dueCount?: number;
+    /** Suggested difficulty from adaptive system */
+    suggestedDifficulty?: Difficulty;
 }
 
 const LANGUAGE_OPTIONS: Array<{ value: SupportedLanguage; label: string }> = [
@@ -76,6 +81,8 @@ export function SessionControlBar({
     disabled,
     isTerminalMode,
     prefersReducedMotion,
+    dueCount,
+    suggestedDifficulty,
 }: SessionControlBarProps) {
     const { panelGlass, border } = SESSION_CSS_VARS;
     const controlsMotion = getControlsMotion(prefersReducedMotion);
@@ -156,6 +163,20 @@ export function SessionControlBar({
                     </Button>
                 ))}
             </Flex>
+
+            {/* Due count & suggested difficulty */}
+            {(dueCount !== undefined && dueCount > 0) && (
+                <Flex align="center" gap={1} px={2}>
+                    <Text fontSize="xs" color="var(--accent)" fontWeight={600}>
+                        📚 {dueCount} due
+                    </Text>
+                </Flex>
+            )}
+            {suggestedDifficulty && (
+                <Text fontSize="xs" color="var(--text-subtle)" px={2}>
+                    Suggested: <Text as="span" fontWeight={600} color="var(--text)">{suggestedDifficulty}</Text>
+                </Text>
+            )}
 
             {/* Start Button (only visible in idle phase) */}
             <AnimatePresence>

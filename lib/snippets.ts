@@ -2,6 +2,8 @@
 
 // import leetcodeDataset from "@/data/leetcode-snippets.json";
 
+import type { Token } from "./tokenizer";
+
 export type SupportedLanguage = "javascript" | "python" | "java" | "cpp";
 export type SnippetLength = "short" | "medium" | "long";
 export type Difficulty = "easy" | "medium" | "hard";
@@ -25,6 +27,7 @@ export type Snippet = {
     lines: number;
     sourceSlug?: string;
     frontendId?: number;
+    tokens?: Token[];
 };
 
 type ProblemFilters = {

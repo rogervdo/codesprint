@@ -16,6 +16,7 @@ export type LengthFilter = SnippetLength | "all";
 export interface UseSessionControlsProps {
     snippets: Snippet[];
     onResetEngine: () => void;
+    getNextRecommendation?: (availableIds: string[], currentId: string) => string | null;
 }
 
 export interface UseSessionControlsReturn {
@@ -51,6 +52,7 @@ export interface UseSessionControlsReturn {
 export function useSessionControls({
     snippets,
     onResetEngine,
+    getNextRecommendation,
 }: UseSessionControlsProps): UseSessionControlsReturn {
     const [language, setLanguage] = useState<SupportedLanguage>("python");
     const [lengthPreference, setLengthPreference] = useState<LengthFilter>("short");
@@ -123,13 +125,29 @@ export function useSessionControls({
             return;
         }
 
+        // Check spaced repetition recommendation first
+        if (getNextRecommendation) {
+            const availableSnippetIds = snippetOptions.map((s) => s.id);
+            const recommended = getNextRecommendation(availableSnippetIds, snippet.id);
+            if (recommended) {
+                const recSnippet = snippetOptions.find((s) => s.id === recommended);
+                if (recSnippet) {
+                    onResetEngine();
+                    setProblemId(recSnippet.problemId);
+                    setSnippetId(recSnippet.id);
+                    return;
+                }
+            }
+        }
+
+        // Fall back to sequential cycling
         const currentIndex = problemOptions.findIndex((problem) => problem.id === problemId);
         const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % problemOptions.length : 0;
         const nextProblem = problemOptions[nextIndex];
 
         onResetEngine();
         setProblemId(nextProblem.id);
-    }, [problemId, problemOptions, onResetEngine]);
+    }, [problemId, problemOptions, snippetOptions, snippet, onResetEngine, getNextRecommendation]);
 
     return {
         language,

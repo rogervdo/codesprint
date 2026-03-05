@@ -27,6 +27,9 @@ export type ThemeTokens = {
     caret: string;
     error: string;
     errorExtra: string;
+    ok: string;
+    success: string;
+    warning: string;
     panel: string;
     panelGlass: string;
     panelSoft: string;
@@ -63,6 +66,8 @@ export type PreferencesState = {
     syntaxHighlighting: SyntaxHighlightingMode;
     vimMode: boolean;
     debugGapBuffer: boolean;
+    spacedRepetitionEnabled: boolean;
+    adaptiveDifficultyEnabled: boolean;
 };
 
 export const STORAGE_KEY = "codesprint-preferences";
@@ -142,6 +147,9 @@ function createMinimalTheme(base: string, accent: string, overrides: Partial<The
         caret: accent,
         error: "#da3333",
         errorExtra: "#791717",
+        ok: "#6daf3f",
+        success: "#6daf3f",
+        warning: "#d4a017",
         panel: withAlpha(surfaceBlend, 0.12),
         panelGlass: withAlpha(surfaceBlend, 0.12),
         panelSoft: withAlpha(surfaceBlend, 0.24),
@@ -194,6 +202,9 @@ function createMonkeytypeTheme(colors: MonkeytypeColors): ThemeTokens {
         caret,
         error,
         errorExtra,
+        ok: "#6daf3f",
+        success: "#6daf3f",
+        warning: "#d4a017",
         // UI Elements derived from sub/subAlt for a cohesive look
         panel: withAlpha(subAlt, 0.4),
         panelGlass: withAlpha(subAlt, 0.3),
@@ -251,6 +262,9 @@ export const THEME_PRESETS: Record<ThemePreset, ThemeTokens> = {
         textSubtle: "#a89984",
         panel: "rgba(60, 56, 54, 0.6)",
         border: "rgba(168, 153, 132, 0.3)",
+        ok: "#b8bb26",
+        success: "#b8bb26",
+        warning: "#fabd2f",
     }),
     nord: createMinimalTheme("#2e3440", "#88c0d0", {
         bgMuted: "#3b4252",
@@ -383,6 +397,8 @@ export const DEFAULT_PREFERENCES: PreferencesState = {
     syntaxHighlighting: "full",
     vimMode: false,
     debugGapBuffer: false,
+    spacedRepetitionEnabled: false,
+    adaptiveDifficultyEnabled: false,
 };
 
 export function computeCaretHeight(fontSize: number): number {
@@ -436,6 +452,14 @@ export function sanitizePreferences(value: unknown): PreferencesState {
         vimMode: typeof source.vimMode === "boolean" ? source.vimMode : DEFAULT_PREFERENCES.vimMode,
         debugGapBuffer:
             typeof source.debugGapBuffer === "boolean" ? source.debugGapBuffer : DEFAULT_PREFERENCES.debugGapBuffer,
+        spacedRepetitionEnabled:
+            typeof source.spacedRepetitionEnabled === "boolean"
+                ? source.spacedRepetitionEnabled
+                : DEFAULT_PREFERENCES.spacedRepetitionEnabled,
+        adaptiveDifficultyEnabled:
+            typeof source.adaptiveDifficultyEnabled === "boolean"
+                ? source.adaptiveDifficultyEnabled
+                : DEFAULT_PREFERENCES.adaptiveDifficultyEnabled,
     };
 }
 

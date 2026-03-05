@@ -34,12 +34,13 @@ export interface UseKeyboardShortcutsReturn {
  * Hook to manage global keyboard shortcuts and event listeners
  * Extracted from TypingSession.tsx keyboard handling logic
  *
- * Manages a 5-level keyboard event hierarchy:
+ * Manages a 6-level keyboard event hierarchy:
  * 1. Global Escape Handling (Highest Priority)
- * 2. Vim Toggle (v key, not while running)
- * 3. Vim Preview Mode
- * 4. Global Shortcuts (Non-Vim)
- * 5. Pass to Engine (Typing)
+ * 2. Idle Typing Guard (printable keys in idle bypass shortcuts → engine)
+ * 3. Vim Toggle (v key, finished phase only)
+ * 4. Vim Preview Mode
+ * 5. Global Shortcuts (Non-Vim, finished phase only)
+ * 6. Pass to Engine (Typing)
  */
 export function useKeyboardShortcuts({
     phase,
@@ -117,8 +118,20 @@ export function useKeyboardShortcuts({
                 }
             }
 
-            // 2. Vim Toggle (v) - Allow toggling ON/OFF when not running
-            if (!e.metaKey && !e.ctrlKey && !e.altKey && keyLower === "v" && phase !== "running") {
+            // 2. Idle Typing Guard: in idle phase, printable keys bypass all shortcuts and
+            // go directly to the engine. This prevents r/n/q/l/v/p/a from firing as
+            // shortcuts when a snippet starts with those characters.
+            if (phase === "idle" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                const isPrintable = e.key.length === 1 || e.key === "Enter" || e.key === "Tab";
+                if (isPrintable) {
+                    enableEditorFocus();
+                    engineHandleKeyDown(e);
+                    return;
+                }
+            }
+
+            // 3. Vim Toggle (v) - Allow toggling ON/OFF only in finished phase
+            if (!e.metaKey && !e.ctrlKey && !e.altKey && keyLower === "v" && phase === "finished") {
                 e.preventDefault();
                 e.stopPropagation();
                 if (isVimPreviewing || vimMode) {
@@ -130,7 +143,7 @@ export function useKeyboardShortcuts({
                 return;
             }
 
-            // 3. Vim Preview Mode - Delegate to Monaco, ignore Engine
+            // 4. Vim Preview Mode - Delegate to Monaco, ignore Engine
             if (isVimPreviewing) {
                 // Handle 'i' to start typing
                 if (keyLower === "i" && !e.metaKey && !e.ctrlKey && !e.altKey) {
@@ -168,7 +181,7 @@ export function useKeyboardShortcuts({
                 return;
             }
 
-            // 4. Global Shortcuts (Non-Vim)
+            // 5. Global Shortcuts (Non-Vim, only active in finished phase due to idle guard above)
             if (!e.metaKey && !e.ctrlKey && !e.altKey) {
                 // Handle Tab and Space to go to next test when finished
                 if (phase === "finished" && problemCount > 1) {
@@ -208,9 +221,13 @@ export function useKeyboardShortcuts({
                     // Allow propagation to AppShell for preferences drawer
                     return;
                 }
+                if (keyLower === "a" && phase !== "running") {
+                    // Allow propagation to AppShell for analytics modal
+                    return;
+                }
             }
 
-            // 5. Pass to Engine (Typing)
+            // 6. Pass to Engine (Typing)
             if (allowVimHandling) {
                 enableEditorFocus();
                 engineHandleKeyDown(e);

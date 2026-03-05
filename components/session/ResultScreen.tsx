@@ -1,12 +1,14 @@
 "use client";
 
-import { Stack } from "@chakra-ui/react";
+import { Flex, Stack, Text } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import LiveStats from "@/components/LiveStats";
 import ResultCard from "@/components/ResultCard";
 import { getResultCardMotion } from "@/lib/motion-config";
 import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
 import type { ErrorEntry, HistoryEntry } from "@/hooks/useTypingEngine";
+import type { Token } from "@/lib/tokenizer";
+import type { AchievementDefinition } from "@/lib/achievements";
+import type { Difficulty } from "@/lib/snippets";
 
 export interface ResultScreenProps {
     /** Adjusted WPM score */
@@ -31,8 +33,6 @@ export interface ResultScreenProps {
     errorLog: ErrorEntry[];
     /** Typing history for graphs */
     history: HistoryEntry[];
-    /** Whether to show live stats panel */
-    showLiveStats: boolean;
     /** Auto-advance deadline timestamp (null if not set) */
     autoAdvanceDeadline: number | null;
     /** Whether next problem action is available */
@@ -41,11 +41,23 @@ export interface ResultScreenProps {
     onNext: () => void;
     /** Whether user prefers reduced motion */
     prefersReducedMotion: boolean;
+    /** Pattern score (0-100) */
+    patternScore?: number;
+    /** Tokens from the snippet */
+    tokens?: Token[];
+    /** Content length for pattern analysis */
+    contentLength?: number;
+    /** XP gained from this session */
+    xpGained?: number;
+    /** Achievements unlocked this session */
+    newlyUnlocked?: AchievementDefinition[];
+    /** Difficulty transition suggestion */
+    difficultyTransition?: { newDifficulty: Difficulty; reason: string };
 }
 
 /**
  * Result screen shown when typing session is finished
- * Contains optional LiveStats and ResultCard
+ * Contains the centered result card and optional achievement metadata
  */
 export function ResultScreen({
     wpm,
@@ -59,11 +71,16 @@ export function ResultScreen({
     lengthCategory,
     errorLog,
     history,
-    showLiveStats,
     autoAdvanceDeadline,
     canAdvance,
     onNext,
     prefersReducedMotion,
+    patternScore,
+    tokens,
+    contentLength,
+    xpGained,
+    newlyUnlocked,
+    difficultyTransition,
 }: ResultScreenProps) {
     const resultCardMotion = getResultCardMotion(prefersReducedMotion);
 
@@ -78,10 +95,7 @@ export function ResultScreen({
                 marginTop: 32,
             }}
         >
-            <Stack gap={5} align="center" w="100%" maxW="800px">
-                {showLiveStats && (
-                    <LiveStats wpm={wpm} accuracy={accuracy} label="Final WPM" />
-                )}
+            <Stack gap={5} align="center" w="100%" maxW="1000px">
                 <ResultCard
                     wpm={wpm}
                     accuracy={accuracy}
@@ -96,7 +110,42 @@ export function ResultScreen({
                     lengthCategory={lengthCategory}
                     errorLog={errorLog}
                     history={history}
+                    patternScore={patternScore}
+                    tokens={tokens}
+                    contentLength={contentLength}
                 />
+
+                {(xpGained !== undefined && xpGained > 0) && (
+                    <Text fontSize="md" fontWeight={600} color="var(--accent)">
+                        +{xpGained} XP
+                    </Text>
+                )}
+
+                {newlyUnlocked && newlyUnlocked.length > 0 && (
+                    <Flex gap={2} flexWrap="wrap" justify="center">
+                        {newlyUnlocked.map((a) => (
+                            <Flex
+                                key={a.id}
+                                align="center"
+                                gap={1.5}
+                                px={3}
+                                py={1}
+                                borderRadius="full"
+                                bg="var(--surface)"
+                                border="1px solid var(--border)"
+                            >
+                                <Text fontSize="sm" lineHeight={1}>{a.icon}</Text>
+                                <Text fontSize="xs" fontWeight={600} color="var(--text)">{a.name}</Text>
+                            </Flex>
+                        ))}
+                    </Flex>
+                )}
+
+                {difficultyTransition && difficultyTransition.reason !== "unchanged" && (
+                    <Text fontSize="sm" color="var(--text-subtle)">
+                        Difficulty adjusted to <Text as="span" fontWeight={600} color="var(--accent)">{difficultyTransition.newDifficulty}</Text>
+                    </Text>
+                )}
             </Stack>
         </motion.div>
     );

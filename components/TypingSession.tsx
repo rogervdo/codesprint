@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { Box, Stack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -26,6 +26,10 @@ import { useFocusManagement, useFocusActiveClass } from "@/hooks/useFocusManagem
 import { useSessionLifecycle } from "@/hooks/useSessionLifecycle";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionControls } from "@/hooks/useSessionControls";
+import { useAchievements } from "@/hooks/useAchievements";
+import { useSpacedRepetition } from "@/hooks/useSpacedRepetition";
+import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
+import type { SupportedLanguage, Difficulty, SnippetLength } from "@/lib/snippets";
 
 const CodePanel = dynamic(() => import("@/components/CodePanel"), {
     ssr: false,
@@ -38,6 +42,8 @@ export default function TypingSession() {
 
     // Store engine reset function in a ref to break circular dependency
     const engineResetRef = useRef<() => void>(() => {});
+    // Store SR recommendation function in a ref to break hook ordering dependency
+    const srRecommendationRef = useRef<(availableIds: string[], currentId: string) => string | null>(() => null);
 
     // Preferences
     const {
@@ -66,9 +72,15 @@ export default function TypingSession() {
         engineResetRef.current();
     }, []);
 
+    const handleGetNextRecommendation = useCallback(
+        (availableIds: string[], currentId: string) => srRecommendationRef.current(availableIds, currentId),
+        []
+    );
+
     const controls = useSessionControls({
         snippets,
         onResetEngine: handleResetEngine,
+        getNextRecommendation: handleGetNextRecommendation,
     });
 
     // Typing Engine
@@ -79,13 +91,75 @@ export default function TypingSession() {
     // Update ref with actual reset function
     engineResetRef.current = engine.reset;
 
+    // Achievements, XP, Streaks
+    const achievements = useAchievements({
+        phase: engine.phase,
+        session: {
+            snippetId: controls.snippet.id,
+            wpm: engine.metrics.adjustedWpm,
+            accuracy: engine.metrics.accuracy,
+            elapsedMs: engine.elapsedMs,
+            language: controls.language,
+            difficulty: controls.snippet.difficulty,
+            lengthCategory: controls.snippet.lengthCategory,
+            errorCount: engine.wrongChars.size,
+            totalKeystrokes: engine.totalKeystrokes,
+            correctKeystrokes: engine.correctKeystrokes,
+            patternScore: engine.metrics.patternScore,
+            history: engine.history,
+        },
+        preferences: {
+            vimMode: preferences.vimMode,
+            theme: preferences.theme,
+        },
+    });
+
+    // Spaced Repetition
+    const sr = useSpacedRepetition(controls.language, preferences.spacedRepetitionEnabled);
+    // Update ref so controls can access the recommendation function
+    srRecommendationRef.current = sr.getNextRecommendation;
+
+    // Adaptive Difficulty
+    const adaptive = useAdaptiveDifficulty(controls.language, preferences.adaptiveDifficultyEnabled);
+
+    // Session finished callback for SR + adaptive updates
+    const handleSessionFinished = useCallback((sessionData: {
+        snippetId: string;
+        language: SupportedLanguage;
+        wpm: number;
+        accuracy: number;
+        patternScore?: number;
+        difficulty: Difficulty;
+        lengthCategory: SnippetLength;
+    }) => {
+        sr.updateMastery({
+            snippetId: sessionData.snippetId,
+            language: sessionData.language,
+            accuracy: sessionData.accuracy,
+            patternScore: sessionData.patternScore,
+        });
+        adaptive.updateSkillModel({
+            wpm: sessionData.wpm,
+            accuracy: sessionData.accuracy,
+            difficulty: sessionData.difficulty,
+        });
+    }, [sr, adaptive]);
+
     // Session Lifecycle (auto-advance, score saving)
     const lifecycle = useSessionLifecycle({
         phase: engine.phase,
         snippetId: controls.snippet.id,
         metrics: engine.metrics,
         language: controls.language,
+        elapsedMs: engine.elapsedMs,
+        totalKeystrokes: engine.totalKeystrokes,
+        correctKeystrokes: engine.correctKeystrokes,
+        errorCount: engine.wrongChars.size,
+        history: engine.history,
+        lengthCategory: controls.snippet.lengthCategory,
+        difficulty: controls.snippet.difficulty,
         onResetEngine: engine.reset,
+        onSessionFinished: handleSessionFinished,
     });
 
     // Keyboard Shortcuts
@@ -124,7 +198,6 @@ export default function TypingSession() {
     const showChrome = isTerminalMode ? true : !focusActive;
     const controlsDisabled = engine.phase === "running" || engine.phase === "countdown";
     const showRunningStats = engine.phase === "running" && preferences.showLiveStatsDuringRun;
-    const showLiveStatsPanel = engine.phase === "finished" && preferences.showLiveStatsDuringRun;
 
     const total = controls.snippet.content.length;
     const progress = total === 0 ? 0 : Math.min(1, engine.cursorIndex / total);
@@ -172,6 +245,8 @@ export default function TypingSession() {
                                     disabled={controlsDisabled}
                                     isTerminalMode={isTerminalMode}
                                     prefersReducedMotion={prefersReducedMotion}
+                                    dueCount={sr.dueCount}
+                                    suggestedDifficulty={adaptive.suggestedDifficulty}
                                 />
                             )}
 
@@ -253,11 +328,16 @@ export default function TypingSession() {
                         lengthCategory={controls.snippet.lengthCategory}
                         errorLog={engine.errorLog}
                         history={engine.history}
-                        showLiveStats={showLiveStatsPanel}
                         autoAdvanceDeadline={lifecycle.autoAdvanceDeadline}
                         canAdvance={controls.problemOptions.length > 1}
                         onNext={handleNextProblem}
                         prefersReducedMotion={prefersReducedMotion}
+                        patternScore={engine.metrics.patternScore}
+                        tokens={controls.snippet.tokens}
+                        contentLength={controls.snippet.content.length}
+                        xpGained={achievements.xpGained}
+                        newlyUnlocked={achievements.newlyUnlocked}
+                        difficultyTransition={adaptive.suggestedDifficulty !== controls.snippet.difficulty ? { newDifficulty: adaptive.suggestedDifficulty, reason: "promoted" as const } : undefined}
                     />
                 )}
             </AnimatePresence>

@@ -18,6 +18,23 @@ type SupportedLanguage = "javascript" | "python" | "java" | "cpp";
 type SnippetLength = "short" | "medium" | "long";
 type Difficulty = "easy" | "medium" | "hard";
 
+type TokenCategory =
+    | "keyword"
+    | "operator"
+    | "delimiter"
+    | "identifier"
+    | "literal"
+    | "whitespace"
+    | "comment"
+    | "string";
+
+type Token = {
+    category: TokenCategory;
+    start: number;
+    end: number;
+    text: string;
+};
+
 type Snippet = {
     id: string;
     problemId: string;
@@ -29,6 +46,7 @@ type Snippet = {
     lines: number;
     sourceSlug?: string;
     frontendId?: number;
+    tokens?: Token[];
 };
 
 type DatasetSnippet = {
@@ -157,6 +175,125 @@ function isDifficulty(value: unknown): value is Difficulty {
     return value === "easy" || value === "medium" || value === "hard";
 }
 
+// ---------------------------------------------------------------------------
+// Tokenizer (inline for build-time self-containment)
+// ---------------------------------------------------------------------------
+
+const KEYWORD_SETS: Record<SupportedLanguage, Set<string>> = {
+    javascript: new Set([
+        "abstract","arguments","async","await","boolean","break","byte","case","catch",
+        "char","class","const","continue","debugger","default","delete","do","double",
+        "else","enum","export","extends","false","final","finally","float","for",
+        "function","goto","if","implements","import","in","instanceof","int","interface",
+        "let","long","native","new","null","of","package","private","protected","public",
+        "return","short","static","super","switch","synchronized","this","throw","throws",
+        "transient","true","try","typeof","undefined","var","void","volatile","while","with","yield",
+    ]),
+    python: new Set([
+        "False","None","True","and","as","assert","async","await","break","class",
+        "continue","def","del","elif","else","except","finally","for","from","global",
+        "if","import","in","is","lambda","nonlocal","not","or","pass","raise","return",
+        "try","while","with","yield",
+    ]),
+    java: new Set([
+        "abstract","assert","boolean","break","byte","case","catch","char","class",
+        "const","continue","default","do","double","else","enum","extends","false",
+        "final","finally","float","for","goto","if","implements","import","instanceof",
+        "int","interface","long","native","new","null","package","private","protected",
+        "public","return","short","static","strictfp","super","switch","synchronized",
+        "this","throw","throws","transient","true","try","void","volatile","while",
+    ]),
+    cpp: new Set([
+        "alignas","alignof","and","auto","bool","break","case","catch","char","class",
+        "const","constexpr","continue","default","delete","do","double","dynamic_cast",
+        "else","enum","explicit","export","extern","false","float","for","friend","goto",
+        "if","inline","int","long","mutable","namespace","new","noexcept","not","nullptr",
+        "operator","or","private","protected","public","register","return","short","signed",
+        "sizeof","static","static_cast","struct","switch","template","this","throw","true",
+        "try","typedef","typename","union","unsigned","using","virtual","void","volatile",
+        "while","std","string","vector","map","set","size_t",
+    ]),
+};
+
+const DELIMITERS = new Set(["(",")","{","}","[","]",",",";",":","."]);
+const OPERATOR_CHARS = new Set(["+","-","*","/","%","=","<",">","!","&","|","^","~","?","@"]);
+
+function tokenize(content: string, language: SupportedLanguage): Token[] {
+    const keywords = KEYWORD_SETS[language];
+    const tokens: Token[] = [];
+    let i = 0;
+    while (i < content.length) {
+        const ch = content[i];
+        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+            const start = i;
+            while (i < content.length && (content[i] === " " || content[i] === "\t" || content[i] === "\n" || content[i] === "\r")) i++;
+            tokens.push({ category: "whitespace", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (ch === '"' || ch === "'" || ch === "`") {
+            const start = i;
+            const q = ch;
+            if (language === "python" && i + 2 < content.length && content[i+1] === q && content[i+2] === q) {
+                i += 3;
+                while (i + 2 < content.length && !(content[i] === q && content[i+1] === q && content[i+2] === q)) i++;
+                i = Math.min(i + 3, content.length);
+                tokens.push({ category: "string", start, end: i, text: content.slice(start, i) });
+                continue;
+            }
+            i++;
+            while (i < content.length && content[i] !== q) { if (content[i] === "\\") i++; i++; }
+            if (i < content.length) i++;
+            tokens.push({ category: "string", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (ch === "/" && i + 1 < content.length && content[i+1] === "/") {
+            const start = i;
+            while (i < content.length && content[i] !== "\n") i++;
+            tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (ch === "/" && i + 1 < content.length && content[i+1] === "*") {
+            const start = i; i += 2;
+            while (i + 1 < content.length && !(content[i] === "*" && content[i+1] === "/")) i++;
+            i = Math.min(i + 2, content.length);
+            tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (language === "python" && ch === "#") {
+            const start = i;
+            while (i < content.length && content[i] !== "\n") i++;
+            tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (ch >= "0" && ch <= "9") {
+            const start = i;
+            while (i < content.length && /[0-9a-fA-FxXoObB._eE+\-]/.test(content[i])) i++;
+            tokens.push({ category: "literal", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        if (/[a-zA-Z_$]/.test(ch)) {
+            const start = i;
+            while (i < content.length && /[a-zA-Z0-9_$]/.test(content[i])) i++;
+            const text = content.slice(start, i);
+            tokens.push({ category: keywords.has(text) ? "keyword" : "identifier", start, end: i, text });
+            continue;
+        }
+        if (DELIMITERS.has(ch)) {
+            tokens.push({ category: "delimiter", start: i, end: i + 1, text: ch });
+            i++; continue;
+        }
+        if (OPERATOR_CHARS.has(ch)) {
+            const start = i;
+            while (i < content.length && OPERATOR_CHARS.has(content[i])) i++;
+            tokens.push({ category: "operator", start, end: i, text: content.slice(start, i) });
+            continue;
+        }
+        tokens.push({ category: "identifier", start: i, end: i + 1, text: ch });
+        i++;
+    }
+    return tokens;
+}
+
 function normalizeDataset(raw: unknown): Snippet[] {
     if (!Array.isArray(raw)) return [];
     return raw.flatMap((entry: DatasetSnippet): Snippet[] => {
@@ -213,7 +350,14 @@ async function main() {
     // Normalize
     const normalized = normalizeDataset(dataset);
     console.log(`Normalized to ${normalized.length} usable snippets (filtered out ${dataset.length - normalized.length} skeletal/empty)`);
-    
+
+    // Tokenize validation (ensure all snippets can be tokenized at runtime)
+    let tokenCount = 0;
+    for (const snippet of normalized) {
+        tokenCount += tokenize(snippet.content, snippet.language).length;
+    }
+    console.log(`Validated tokenization for ${normalized.length} snippets (${tokenCount} total tokens)`);
+
     // Write per-language files for fast progressive loading
     const byLanguage: Record<SupportedLanguage, Snippet[]> = {
         javascript: [],

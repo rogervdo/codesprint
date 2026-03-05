@@ -1,5 +1,6 @@
 import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
 import type { HistoryEntry } from "@/hooks/useTypingEngine";
+import { idbGetAll, idbGet, idbPut, idbDelete, idbClear, isIdbAvailable, STORES } from "./idb-store";
 
 export type SessionRecord = {
     id: string;
@@ -16,6 +17,7 @@ export type SessionRecord = {
     correctKeystrokes: number;
     errorCount: number;
     history: HistoryEntry[];
+    patternScore?: number;
 };
 
 export type CreateSessionInput = Omit<SessionRecord, "id" | "date">;
@@ -36,9 +38,12 @@ function isServer(): boolean {
     return typeof window === "undefined";
 }
 
-function readStorage(): SessionRecord[] {
-    if (isServer()) return [];
+// ---------------------------------------------------------------------------
+// localStorage helpers (fallback / SSR)
+// ---------------------------------------------------------------------------
 
+function readLocalStorage(): SessionRecord[] {
+    if (isServer()) return [];
     try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (!stored) return [];
@@ -50,15 +55,152 @@ function readStorage(): SessionRecord[] {
     }
 }
 
-function writeStorage(records: SessionRecord[]): void {
+function writeLocalStorage(records: SessionRecord[]): void {
     if (isServer()) return;
-
     try {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
     } catch {
-        // Storage quota exceeded or other error - silently fail
+        // Storage quota exceeded or other error
     }
 }
+
+// ---------------------------------------------------------------------------
+// Async API (IndexedDB primary, localStorage fallback)
+// ---------------------------------------------------------------------------
+
+export async function createSessionAsync(input: CreateSessionInput): Promise<SessionRecord | null> {
+    if (isServer()) return null;
+
+    const record: SessionRecord = {
+        ...input,
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+    };
+
+    try {
+        if (await isIdbAvailable()) {
+            await idbPut(STORES.sessions, record);
+        }
+        // Keep localStorage mirror in sync for legacy sync readers (analytics, tests, etc).
+        const existing = readLocalStorage();
+        const updated = [record, ...existing].slice(0, MAX_RECORDS);
+        writeLocalStorage(updated);
+        return record;
+    } catch {
+        // Last resort: try localStorage
+        const existing = readLocalStorage();
+        const updated = [record, ...existing].slice(0, MAX_RECORDS);
+        writeLocalStorage(updated);
+        return record;
+    }
+}
+
+export async function getSessionAsync(id: string): Promise<SessionRecord | null> {
+    if (isServer()) return null;
+
+    try {
+        if (await isIdbAvailable()) {
+            const record = await idbGet<SessionRecord>(STORES.sessions, id);
+            return record ?? null;
+        }
+    } catch {
+        // fall through
+    }
+
+    const records = readLocalStorage();
+    return records.find((r) => r.id === id) ?? null;
+}
+
+export async function getSessionsAsync(filters?: SessionFilters): Promise<SessionRecord[]> {
+    if (isServer()) return [];
+
+    let records: SessionRecord[];
+    try {
+        if (await isIdbAvailable()) {
+            records = await idbGetAll<SessionRecord>(STORES.sessions);
+            // Sort by date descending (newest first)
+            records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        } else {
+            records = readLocalStorage();
+        }
+    } catch {
+        records = readLocalStorage();
+    }
+
+    return applyFilters(records, filters);
+}
+
+export async function deleteSessionAsync(id: string): Promise<boolean> {
+    if (isServer()) return false;
+
+    let deletedInIdb = false;
+    try {
+        if (await isIdbAvailable()) {
+            await idbDelete(STORES.sessions, id);
+            deletedInIdb = true;
+        }
+    } catch {
+        // fall through to localStorage update
+    }
+
+    const records = readLocalStorage();
+    const filtered = records.filter((r) => r.id !== id);
+    const deletedInLocalStorage = filtered.length !== records.length;
+    if (deletedInLocalStorage) {
+        writeLocalStorage(filtered);
+    }
+    return deletedInIdb || deletedInLocalStorage;
+}
+
+export async function clearSessionsAsync(): Promise<void> {
+    if (isServer()) return;
+
+    try {
+        if (await isIdbAvailable()) {
+            await idbClear(STORES.sessions);
+        }
+    } catch {
+        // fall through
+    }
+    window.localStorage.removeItem(STORAGE_KEY);
+}
+
+export async function getSessionStatsAsync(filters?: Omit<SessionFilters, "limit" | "offset">): Promise<{
+    totalSessions: number;
+    averageWpm: number;
+    averageAccuracy: number;
+    bestWpm: number;
+    totalTimeMs: number;
+}> {
+    const records = await getSessionsAsync(filters);
+
+    if (records.length === 0) {
+        return {
+            totalSessions: 0,
+            averageWpm: 0,
+            averageAccuracy: 0,
+            bestWpm: 0,
+            totalTimeMs: 0,
+        };
+    }
+
+    const totalWpm = records.reduce((sum, r) => sum + r.wpm, 0);
+    const totalAccuracy = records.reduce((sum, r) => sum + r.accuracy, 0);
+    const bestWpm = Math.max(...records.map((r) => r.wpm));
+    const totalTimeMs = records.reduce((sum, r) => sum + r.elapsedMs, 0);
+
+    return {
+        totalSessions: records.length,
+        averageWpm: totalWpm / records.length,
+        averageAccuracy: totalAccuracy / records.length,
+        bestWpm,
+        totalTimeMs,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Synchronous API (localStorage only — backward compatibility)
+// ---------------------------------------------------------------------------
 
 export function createSession(input: CreateSessionInput): SessionRecord | null {
     if (isServer()) return null;
@@ -70,9 +212,14 @@ export function createSession(input: CreateSessionInput): SessionRecord | null {
             date: new Date().toISOString(),
         };
 
-        const existing = readStorage();
+        const existing = readLocalStorage();
         const updated = [record, ...existing].slice(0, MAX_RECORDS);
-        writeStorage(updated);
+        writeLocalStorage(updated);
+
+        // Also write to IndexedDB in background (fire-and-forget)
+        isIdbAvailable().then((ok) => {
+            if (ok) idbPut(STORES.sessions, record);
+        }).catch(() => {});
 
         return record;
     } catch {
@@ -82,41 +229,21 @@ export function createSession(input: CreateSessionInput): SessionRecord | null {
 
 export function getSession(id: string): SessionRecord | null {
     if (isServer()) return null;
-
-    const records = readStorage();
+    const records = readLocalStorage();
     return records.find((r) => r.id === id) ?? null;
 }
 
 export function getSessions(filters?: SessionFilters): SessionRecord[] {
     if (isServer()) return [];
-
-    let records = readStorage();
-
-    if (filters?.language) {
-        records = records.filter((r) => r.language === filters.language);
-    }
-    if (filters?.lengthCategory) {
-        records = records.filter((r) => r.lengthCategory === filters.lengthCategory);
-    }
-    if (filters?.difficulty) {
-        records = records.filter((r) => r.difficulty === filters.difficulty);
-    }
-    if (filters?.snippetId) {
-        records = records.filter((r) => r.snippetId === filters.snippetId);
-    }
-
-    const offset = filters?.offset ?? 0;
-    const limit = filters?.limit ?? records.length;
-
-    return records.slice(offset, offset + limit);
+    const records = readLocalStorage();
+    return applyFilters(records, filters);
 }
 
 export function updateSession(id: string, updates: Partial<Omit<SessionRecord, "id" | "date">>): SessionRecord | null {
     if (isServer()) return null;
 
-    const records = readStorage();
+    const records = readLocalStorage();
     const index = records.findIndex((r) => r.id === id);
-
     if (index === -1) return null;
 
     const updated: SessionRecord = {
@@ -127,7 +254,7 @@ export function updateSession(id: string, updates: Partial<Omit<SessionRecord, "
     };
 
     const newRecords = [...records.slice(0, index), updated, ...records.slice(index + 1)];
-    writeStorage(newRecords);
+    writeLocalStorage(newRecords);
 
     return updated;
 }
@@ -135,12 +262,10 @@ export function updateSession(id: string, updates: Partial<Omit<SessionRecord, "
 export function deleteSession(id: string): boolean {
     if (isServer()) return false;
 
-    const records = readStorage();
+    const records = readLocalStorage();
     const filtered = records.filter((r) => r.id !== id);
-
     if (filtered.length === records.length) return false;
-
-    writeStorage(filtered);
+    writeLocalStorage(filtered);
     return true;
 }
 
@@ -188,4 +313,30 @@ export function getRecentSessions(count: number = 10): SessionRecord[] {
 
 export function getSessionsBySnippet(snippetId: string): SessionRecord[] {
     return getSessions({ snippetId });
+}
+
+// ---------------------------------------------------------------------------
+// Shared filter logic
+// ---------------------------------------------------------------------------
+
+function applyFilters(records: SessionRecord[], filters?: SessionFilters): SessionRecord[] {
+    let result = records;
+
+    if (filters?.language) {
+        result = result.filter((r) => r.language === filters.language);
+    }
+    if (filters?.lengthCategory) {
+        result = result.filter((r) => r.lengthCategory === filters.lengthCategory);
+    }
+    if (filters?.difficulty) {
+        result = result.filter((r) => r.difficulty === filters.difficulty);
+    }
+    if (filters?.snippetId) {
+        result = result.filter((r) => r.snippetId === filters.snippetId);
+    }
+
+    const offset = filters?.offset ?? 0;
+    const limit = filters?.limit ?? result.length;
+
+    return result.slice(offset, offset + limit);
 }

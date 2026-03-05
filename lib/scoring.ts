@@ -1,9 +1,15 @@
 "use client";
 
+import type { Token } from "./tokenizer";
+import { buildCategoryMap } from "./tokenizer";
+import { getWeights } from "./token-weights";
+import type { SupportedLanguage } from "./snippets";
+
 export type Metrics = {
     rawWpm: number;
     adjustedWpm: number;
     accuracy: number;
+    patternScore?: number;
 };
 
 const MS_IN_MINUTE = 1000 * 60;
@@ -42,4 +48,58 @@ export function computeMetrics({ correctProgress, elapsedMs, totalTyped, totalKe
         adjustedWpm,
         accuracy,
     };
+}
+
+// ---------------------------------------------------------------------------
+// Pattern Score
+// ---------------------------------------------------------------------------
+
+type PatternScoreInput = {
+    /** Error positions in the content string */
+    errorPositions: number[];
+    /** Tokens from the tokenizer */
+    tokens: Token[];
+    /** Total content length */
+    contentLength: number;
+    /** Language for weight lookup */
+    language: SupportedLanguage;
+};
+
+/**
+ * Compute a pattern score (0-100) that reflects how well the user typed
+ * syntax-significant tokens.
+ *
+ * Higher score = fewer errors on high-weight tokens.
+ * A perfect run = 100.
+ */
+export function computePatternScore({
+    errorPositions,
+    tokens,
+    contentLength,
+    language,
+}: PatternScoreInput): number {
+    if (tokens.length === 0 || contentLength === 0) return 100;
+
+    const categoryMap = buildCategoryMap(tokens, contentLength);
+    const weights = getWeights(language);
+
+    // Total weighted characters and weighted errors
+    let totalWeight = 0;
+    let errorWeight = 0;
+
+    const errorSet = new Set(errorPositions);
+
+    for (let i = 0; i < contentLength; i++) {
+        const category = categoryMap[i];
+        const w = weights[category];
+        totalWeight += w;
+        if (errorSet.has(i)) {
+            errorWeight += w;
+        }
+    }
+
+    if (totalWeight === 0) return 100;
+
+    const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
+    return Math.max(0, Math.min(100, score));
 }

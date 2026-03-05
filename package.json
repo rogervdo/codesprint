@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "bun run build:snippets && next build",
+    "dev": "./node_modules/.bin/next dev --turbopack",
+    "build": "bun run build:snippets && ./node_modules/.bin/next build",
     "build:snippets": "bun scripts/build-snippets.ts",
-    "start": "next start",
-    "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "start": "./node_modules/.bin/next start",
+    "lint": "./node_modules/.bin/eslint",
+    "test": "./node_modules/.bin/vitest run",
+    "test:watch": "./node_modules/.bin/vitest",
+    "test:e2e": "./node_modules/.bin/playwright test",
     "sync:leetcode": "bun scripts/sync-leetcode.ts && bun run build:snippets"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -35,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "fake-indexeddb": "^6.2.5",
     "jsdom": "^27.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",

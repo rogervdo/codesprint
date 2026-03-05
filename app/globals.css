@@ -13,6 +13,9 @@
     --caret: #fbf1c7;
     --ok: #b8bb26;
     --err: #fb4934;
+    --success: #b8bb26;
+    --warning: #fabd2f;
+    --error: #fb4934;
     --panel: rgba(251, 241, 199, 0.12);
     --panel-glass: rgba(251, 241, 199, 0.18);
     --panel-soft: rgba(251, 241, 199, 0.24);
@@ -138,8 +141,8 @@ main {
 }
 
 .cs-caret.cs-caret-error {
-    background: #fa7878;
-    box-shadow: 0 0 18px rgba(250, 120, 120, 0.45);
+    background: var(--error);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--error) 45%, transparent);
     animation: cs-caret-error 0.35s ease-out;
 }
 
@@ -158,15 +161,15 @@ main {
 
 @keyframes cs-caret-error {
     0% {
-        box-shadow: 0 0 0 rgba(250, 120, 120, 0);
+        box-shadow: 0 0 0 color-mix(in srgb, var(--error) 0%, transparent);
     }
 
     45% {
-        box-shadow: 0 0 24px rgba(250, 120, 120, 0.6);
+        box-shadow: 0 0 24px color-mix(in srgb, var(--error) 60%, transparent);
     }
 
     100% {
-        box-shadow: 0 0 0 rgba(250, 120, 120, 0);
+        box-shadow: 0 0 0 color-mix(in srgb, var(--error) 0%, transparent);
     }
 }
 
@@ -183,10 +186,10 @@ main {
 }
 
 .cs-wrong {
-    color: #ff7b7b !important;
+    color: var(--error) !important;
     background: transparent !important;
     text-decoration: underline !important;
-    text-decoration-color: #ff7b7b;
+    text-decoration-color: var(--error);
     text-decoration-thickness: 2px;
     text-decoration-skip-ink: auto;
 }

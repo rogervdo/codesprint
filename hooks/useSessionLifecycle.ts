@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveScore } from "@/lib/leaderboard";
-import type { SupportedLanguage } from "@/lib/snippets";
+import { createSessionAsync } from "@/lib/storage/session-history";
+import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
+import type { HistoryEntry } from "@/hooks/useTypingEngine";
 import type { Phase } from "./useFocusManagement";
 
 export interface UseSessionLifecycleProps {
@@ -10,10 +12,28 @@ export interface UseSessionLifecycleProps {
     snippetId: string;
     metrics: {
         adjustedWpm: number;
+        rawWpm: number;
         accuracy: number;
+        patternScore?: number;
     };
     language: SupportedLanguage;
+    elapsedMs: number;
+    totalKeystrokes: number;
+    correctKeystrokes: number;
+    errorCount: number;
+    history: HistoryEntry[];
+    lengthCategory: SnippetLength;
+    difficulty: Difficulty;
     onResetEngine: () => void;
+    onSessionFinished?: (sessionData: {
+        snippetId: string;
+        language: SupportedLanguage;
+        wpm: number;
+        accuracy: number;
+        patternScore?: number;
+        difficulty: Difficulty;
+        lengthCategory: SnippetLength;
+    }) => void;
 }
 
 export interface UseSessionLifecycleReturn {
@@ -36,7 +56,15 @@ export function useSessionLifecycle({
     snippetId,
     metrics,
     language,
+    elapsedMs,
+    totalKeystrokes,
+    correctKeystrokes,
+    errorCount,
+    history,
+    lengthCategory,
+    difficulty,
     onResetEngine,
+    onSessionFinished,
 }: UseSessionLifecycleProps): UseSessionLifecycleReturn {
     const [autoAdvanceDeadline, setAutoAdvanceDeadline] = useState<number | null>(null);
     const autoAdvanceTimeoutRef = useRef<number | null>(null);
@@ -71,8 +99,38 @@ export function useSessionLifecycle({
                 language,
                 snippetId,
             });
+
+            createSessionAsync({
+                snippetId,
+                language,
+                lengthCategory,
+                difficulty,
+                wpm: metrics.adjustedWpm,
+                rawWpm: metrics.rawWpm,
+                accuracy: metrics.accuracy,
+                elapsedMs,
+                totalKeystrokes,
+                correctKeystrokes,
+                errorCount,
+                history,
+                patternScore: metrics.patternScore,
+            }).catch(() => {
+                // IndexedDB may be unavailable; legacy saveScore above provides fallback
+            });
+
+            if (onSessionFinished) {
+                onSessionFinished({
+                    snippetId,
+                    language,
+                    wpm: metrics.adjustedWpm,
+                    accuracy: metrics.accuracy,
+                    patternScore: metrics.patternScore,
+                    difficulty,
+                    lengthCategory,
+                });
+            }
         }
-    }, [phase, metrics.adjustedWpm, metrics.accuracy, language, snippetId]);
+    }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, difficulty, onSessionFinished]);
 
     return {
         autoAdvanceDeadline,

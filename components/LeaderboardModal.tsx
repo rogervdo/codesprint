@@ -25,18 +25,19 @@ type LeaderboardModalProps = {
 
 export default function LeaderboardModal({ isOpen, onOpenChange }: LeaderboardModalProps) {
     const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+    const [confirmingClear, setConfirmingClear] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setEntries(getLeaderboard());
+            setConfirmingClear(false);
         }
     }, [isOpen]);
 
     const handleClear = () => {
-        if (confirm("Are you sure you want to clear your history? This cannot be undone.")) {
-            clearLeaderboard();
-            setEntries([]);
-        }
+        clearLeaderboard();
+        setEntries([]);
+        setConfirmingClear(false);
     };
 
     return (
@@ -73,7 +74,7 @@ export default function LeaderboardModal({ isOpen, onOpenChange }: LeaderboardMo
                                         <Table.Cell fontWeight="bold">{Math.round(entry.wpm)}</Table.Cell>
                                         <Table.Cell>{Math.round(entry.accuracy)}%</Table.Cell>
                                         <Table.Cell>
-                                            <Badge variant="subtle" colorScheme="blue" size="sm">
+                                            <Badge variant="subtle" bg="var(--surface)" color="var(--accent)" size="sm">
                                                 {entry.language}
                                             </Badge>
                                         </Table.Cell>
@@ -87,16 +88,27 @@ export default function LeaderboardModal({ isOpen, onOpenChange }: LeaderboardMo
                     )}
                 </DialogBody>
                 <DialogFooter borderTop="1px solid var(--border)">
-                    <Button variant="ghost" color="var(--error)" size="sm" onClick={handleClear} mr="auto">
-                        Clear History
-                    </Button>
+                    {confirmingClear ? (
+                        <Flex align="center" gap={2} mr="auto">
+                            <Text fontSize="sm" color="var(--text-subtle)">Clear all history?</Text>
+                            <Button variant="solid" bg="var(--error)" color="white" size="sm" onClick={handleClear}>
+                                Yes
+                            </Button>
+                            <Button variant="ghost" color="var(--text-subtle)" size="sm" onClick={() => setConfirmingClear(false)}>
+                                Cancel
+                            </Button>
+                        </Flex>
+                    ) : (
+                        <Button variant="ghost" color="var(--error)" size="sm" onClick={() => setConfirmingClear(true)} mr="auto">
+                            Clear History
+                        </Button>
+                    )}
                     <DialogCloseTrigger asChild>
                         <Button variant="outline" borderColor="var(--border)" color="var(--text)">
                             Close
                         </Button>
                     </DialogCloseTrigger>
                 </DialogFooter>
-                <DialogCloseTrigger />
             </DialogContent>
         </DialogRoot>
     );
