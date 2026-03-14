@@ -17,60 +17,87 @@
 </p>
 
 <p align="center">
-  <strong>A "muscle memory engine" for LeetCode patterns.</strong>
+  <strong>A code typing trainer that builds real syntax muscle memory.</strong>
   <br>
-  It syncs real problem snippets via a custom GraphQL scraper and scores your typing accuracy against the actual syntax trees.
+  Practice 1,800+ real LeetCode snippets across Python, JavaScript, Java, and C++ with syntax-aware scoring, spaced repetition, and adaptive difficulty.
 </p>
 
 <p align="center">
-  <a href="#engineering">Engineering</a> · <a href="#the-data-pipeline">Data Pipeline</a> · <a href="#running-locally">Running Locally</a>
+  <a href="#features">Features</a> · <a href="#how-it-works">How It Works</a> · <a href="#data-pipeline">Data Pipeline</a> · <a href="#running-locally">Running Locally</a>
 </p>
 
 ## Why?
 
-Most typing tests are just `String.split(' ')`. I felt like they measure your ability to type English, but that doesn't translate as much when you're typing code.
+Most typing tests measure how fast you can type English. That doesn't translate when you're writing code full of brackets, operators, and indentation.
 
-I built CodeSprint because I realized people sometimes fail technical interviews not on logic, but on syntax fluency. I needed a way to drill "Depth First Search in Python" or "Ring Buffer in C++" until my fingers knew the shape of the code.
+CodeSprint exists because syntax fluency matters in interviews and daily work. It lets you drill patterns like "Depth First Search in Python" or "Ring Buffer in C++" until your fingers know the shape of the code.
 
-## Engineering
+## Features
 
-I wanted to create more than just a text area wrapper. Here is how I went about making it:
+### Syntax-Aware Scoring
 
-### 1. The Renderer (Monaco + Delta Decorations)
+CodeSprint doesn't just count correct characters. It tokenizes each snippet by language and weights different constructs:
 
-Instead of building a custom canvas renderer (yet), CodeSprint runs a heavily customized instance of the Monaco Editor (the core of VS Code).
+- **Keywords** and **operators** are weighted 1.5x
+- **Delimiters** (brackets, parens) are weighted 1.2x
+- **Whitespace** is weighted 0.5x
 
-- **Diffing**: It uses `deltaDecorations` to paint correct/incorrect keystrokes directly onto the editor model without breaking the underlying syntax highlighting.
-- **Layout**: It calculates `getScrolledVisiblePosition` to overlay a really nice custom caret that behaves smoother than the native DOM caret.
+You get three metrics per session: raw WPM, adjusted WPM (only perfect words), and a pattern score that reflects how well you nailed the actual code constructs.
 
-### 2. The Sync Script (Bun)
+### Spaced Repetition
 
-I didn't really want to hardcode snippets. So, I wrote a custom scraper in Bun (`scripts/sync-leetcode.ts`) that:
+Built on the SM-2 algorithm (the same one behind Anki). CodeSprint tracks per-snippet mastery and schedules reviews based on your performance. Snippets you struggle with come back sooner; ones you've mastered fade into longer intervals.
 
-- Reverse-engineers the LeetCode GraphQL schema.
-- Fetches problems by difficulty and acceptance rate.
-- Sanitizes the code (strips docstrings and excessive comments).
-- Normalizes indentation to standard 4-space tabs.
+### Adaptive Difficulty
 
-### 3. The Latency Fight
+The app tracks your proficiency per language and recommends what to practice next. It adjusts difficulty based on your recent accuracy and speed so you're always working at the right edge of your ability.
 
-React's render cycle is often too slow for a 100 WPM feedback loop. The typing engine (`hooks/useTypingEngine.ts`) isolates the keystroke logic from the React render tree where possible, only triggering re-renders for specific UI updates (like the WPM gauge) to avoid garbage collection pauses during typing bursts.
+### Achievements & Progression
 
-## The Data Pipeline
+30+ achievements across speed, accuracy, consistency, and exploration categories with rarity tiers from common to legendary. An XP system with leveling tracks your overall progress, and streak tracking keeps you coming back daily.
 
-To keep the snippets fresh, you can run the sync script locally:
+### Customizable Editor
+
+- 18+ color themes
+- Vim mode support
+- Configurable font size, caret width, and syntax highlighting level
+- Panel mode or immersive/terminal mode for distraction-free practice
+- Countdown timer before sessions (optional)
+
+### Multi-Language Support
+
+1,800+ real snippets sourced from LeetCode problems across four languages (JavaScript, Python, Java, C++) and three difficulty tiers (easy, medium, hard), categorized by length.
+
+## How It Works
+
+### The Editor
+
+CodeSprint runs a heavily customized Monaco Editor instance. It uses `deltaDecorations` to paint correct/incorrect keystrokes directly onto the editor model without breaking syntax highlighting, and overlays a custom caret that animates smoother than the native DOM cursor.
+
+### The Typing Engine
+
+React's render cycle is too slow for a 100+ WPM feedback loop. The typing engine (`hooks/useTypingEngine.ts`) isolates keystroke logic from the React render tree, only triggering re-renders for specific UI updates like the WPM gauge. Metrics are recalculated on a throttled interval rather than every keystroke.
+
+### Storage
+
+Everything runs client-side with no backend required. Session history, achievements, mastery records, and XP live in IndexedDB with localStorage as a fallback for preferences. Data export is available in CSV and JSON formats.
+
+## Data Pipeline
+
+Snippets are sourced from LeetCode via a custom GraphQL scraper that reverse-engineers their API. To sync fresh snippets:
 
 ```bash
 # Requires Bun (https://bun.sh)
 npm run sync:leetcode -- --limit 50 --difficulties medium,hard
 ```
 
-This will:
+This queries the LeetCode `questionData` endpoint, extracts code snippets for all four languages, strips docstrings and excessive comments, normalizes indentation, and outputs a categorized JSON catalog.
 
-- Query the LeetCode `questionData` endpoint.
-- Parse `codeSnippets` for C++, Java, Python, and JS.
-- Output a minified JSON catalog to `data/leetcode-snippets.json`.
-- Autosort them into short, medium, and long problems.
+After syncing, build the processed snippet files with tokenization metadata:
+
+```bash
+npm run build:snippets
+```
 
 ## Running Locally
 
@@ -78,16 +105,33 @@ This will:
 # Install dependencies
 npm install
 
-# Start the Next.js 15 Turbopack server
+# Start the dev server (Next.js 15 + Turbopack)
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open [http://localhost:3000](http://localhost:3000).
+
+### Testing
+
+```bash
+npm run test         # Unit tests (Vitest)
+npm run test:watch   # Watch mode
+npm run test:e2e     # E2E tests (Playwright)
+```
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
 
 ## Roadmap
 
-- **Custom Renderer**: Migrating from Monaco to a custom WebGL/Canvas text renderer to support large files with zero DOM overhead (Gap Buffer implementation in progress).
-- **Parser Integration**: Using Tree-sitter to allow "semantic typing" (skipping whitespace/formatting irrelevant to the code logic).
+- **Custom Renderer** - Migrating from Monaco to a WebGL/Canvas text renderer for zero DOM overhead (Gap Buffer implementation in progress).
+- **Tree-sitter Integration** - Semantic typing that lets you skip whitespace and formatting irrelevant to code logic.
+- **Advanced Analytics** - Pattern weakness identification across sessions.
+- **Community Features** - Public leaderboards and challenge events.
 
 ## License
 
