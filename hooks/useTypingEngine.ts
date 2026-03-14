@@ -13,6 +13,13 @@ function normalizeWhitespace(ch: string) {
     return ch === "\r" ? "\n" : ch;
 }
 
+function shouldFinishAtIndex(nextIndex: number, content: string) {
+    const isEnd = nextIndex >= content.length;
+    const isTrailingNewline = nextIndex === content.length - 1 && content[nextIndex] === "\n";
+
+    return isEnd || isTrailingNewline;
+}
+
 type UseTypingEngineProps = {
     snippet: Snippet;
     onFinish?: () => void;
@@ -455,17 +462,6 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 next.delete(currentIndex);
                 return next;
             });
-
-            // Check for completion immediately after a correct keystroke
-            const nextIdx = newCursor;
-            const snippetContent = snippetRef.current.content;
-            const isEnd = nextIdx >= snippetContent.length;
-            const isTrailingNewline = nextIdx === snippetContent.length - 1 && snippetContent[nextIdx] === "\n";
-
-            if (isEnd || isTrailingNewline) {
-                setPhase("finished");
-                if (onFinish) onFinish();
-            }
         } else {
             setWrongChars(prev => new Set(prev).add(currentIndex));
             setLastErrorAt(timestamp);
@@ -475,6 +471,11 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 if (next.length > 200) next.shift();
                 return next;
             });
+        }
+
+        if (shouldFinishAtIndex(newCursor, snippetRef.current.content)) {
+            setPhase("finished");
+            if (onFinish) onFinish();
         }
 
     }, [autoAdvanceIndentationIfAllowed, onFinish, preferences.vimMode]);

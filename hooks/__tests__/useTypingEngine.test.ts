@@ -301,6 +301,25 @@ describe("useTypingEngine", () => {
         expect(onFinish).toHaveBeenCalledTimes(1);
     });
 
+    it("transitions to finished phase when the last character is typed incorrectly", () => {
+        const snippet = makeSnippet("ab");
+        const onFinish = vi.fn();
+        const { result } = renderHook(() =>
+            useTypingEngine({ snippet, onFinish })
+        );
+
+        act(() => {
+            result.current.handleKeyDown(fireKey("a"));
+        });
+        act(() => {
+            result.current.handleKeyDown(fireKey("x"));
+        });
+
+        expect(result.current.phase).toBe("finished");
+        expect(result.current.wrongChars.has(1)).toBe(true);
+        expect(onFinish).toHaveBeenCalledTimes(1);
+    });
+
     // -------------------------------------------------------------------------
     // Enter treated as newline
     // -------------------------------------------------------------------------

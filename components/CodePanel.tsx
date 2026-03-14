@@ -394,14 +394,29 @@ export default function CodePanel({
         caretPositionRef.current = caretPosition;
         scheduleCaretRender();
         triggerCaretActivity();
-        if (caretPosition && editor) {
-            if (monaco) {
-                editor.revealPositionInCenterIfOutsideViewport(caretPosition, monaco.editor.ScrollType.Smooth);
-            } else {
-                editor.revealPositionInCenterIfOutsideViewport(caretPosition);
-            }
-        }
+        if (!caretPosition) return;
 
+        const previewIndex = getPreviewIndex(content, caretIndex);
+        const previewPosition = model.getPositionAt(previewIndex);
+        const previewRange = new monaco.Range(
+            caretPosition.lineNumber,
+            caretPosition.column,
+            previewPosition.lineNumber,
+            previewPosition.column,
+        );
+
+        editor.revealRangeIfOutsideViewport(previewRange, monaco.editor.ScrollType.Immediate);
+    }, [cursorChar, content, editorReadyToken, scheduleCaretRender, triggerCaretActivity, ensureCaretNode]);
+
+    useEffect(() => {
+        ensureCaretNode();
+        const editor = editorRef.current;
+        const monaco = monacoRef.current;
+        if (!editor || !monaco) return;
+        const model = editor.getModel();
+        if (!model) return;
+
+        const caretIndex = Math.max(0, Math.min(cursorChar, content.length));
         const caretNode = caretNodeRef.current;
         if (caretNode) {
             caretNode.classList.toggle("cs-caret-error", caretErrorActive);
@@ -445,7 +460,7 @@ export default function CodePanel({
             ...completedDecorations,
             ...errorDecorations,
         ]);
-    }, [cursorChar, wrongChars, content, caretErrorActive, editorReadyToken, scheduleCaretRender, triggerCaretActivity, ensureCaretNode]);
+    }, [cursorChar, wrongChars, content, caretErrorActive, editorReadyToken, ensureCaretNode]);
 
     useEffect(() => {
         return () => {
