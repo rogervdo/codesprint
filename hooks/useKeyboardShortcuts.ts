@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Phase } from "./useFocusManagement";
 
 export interface UseKeyboardShortcutsProps {
@@ -58,6 +58,13 @@ export function useKeyboardShortcuts({
     clearAutoAdvance,
 }: UseKeyboardShortcutsProps): UseKeyboardShortcutsReturn {
     const [isVimPreviewing, setIsVimPreviewing] = useState(false);
+    const vimPreviewTimeoutRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (vimPreviewTimeoutRef.current !== null) window.clearTimeout(vimPreviewTimeoutRef.current);
+        };
+    }, []);
 
     const beginVimPreview = useCallback(() => {
         if (!vimMode) {
@@ -65,7 +72,7 @@ export function useKeyboardShortcuts({
         }
         setIsVimPreviewing(true);
         enableEditorFocus();
-        setTimeout(() => focusEditor(), 40);
+        vimPreviewTimeoutRef.current = window.setTimeout(() => focusEditor(), 40);
     }, [enableEditorFocus, vimMode, setVimMode, focusEditor]);
 
     const exitVimPreview = useCallback(() => {

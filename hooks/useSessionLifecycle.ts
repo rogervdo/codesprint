@@ -68,6 +68,7 @@ export function useSessionLifecycle({
 }: UseSessionLifecycleProps): UseSessionLifecycleReturn {
     const [autoAdvanceDeadline, setAutoAdvanceDeadline] = useState<number | null>(null);
     const autoAdvanceTimeoutRef = useRef<number | null>(null);
+    const hasSavedRef = useRef(false);
 
     const clearAutoAdvance = useCallback(() => {
         if (autoAdvanceTimeoutRef.current !== null) {
@@ -86,49 +87,51 @@ export function useSessionLifecycle({
 
     // Reset engine when snippet changes
     useEffect(() => {
+        hasSavedRef.current = false;
         onResetEngine();
         clearAutoAdvance();
     }, [snippetId, onResetEngine, clearAutoAdvance]);
 
     // Save score on finish
     useEffect(() => {
-        if (phase === "finished") {
-            saveScore({
-                wpm: metrics.adjustedWpm,
-                accuracy: metrics.accuracy,
-                language,
-                snippetId,
-            });
+        if (phase !== "finished" || hasSavedRef.current) return;
+        hasSavedRef.current = true;
 
-            createSessionAsync({
+        saveScore({
+            wpm: metrics.adjustedWpm,
+            accuracy: metrics.accuracy,
+            language,
+            snippetId,
+        });
+
+        createSessionAsync({
+            snippetId,
+            language,
+            lengthCategory,
+            difficulty,
+            wpm: metrics.adjustedWpm,
+            rawWpm: metrics.rawWpm,
+            accuracy: metrics.accuracy,
+            elapsedMs,
+            totalKeystrokes,
+            correctKeystrokes,
+            errorCount,
+            history,
+            patternScore: metrics.patternScore,
+        }).catch(() => {
+            // IndexedDB may be unavailable; legacy saveScore above provides fallback
+        });
+
+        if (onSessionFinished) {
+            onSessionFinished({
                 snippetId,
                 language,
-                lengthCategory,
-                difficulty,
                 wpm: metrics.adjustedWpm,
-                rawWpm: metrics.rawWpm,
                 accuracy: metrics.accuracy,
-                elapsedMs,
-                totalKeystrokes,
-                correctKeystrokes,
-                errorCount,
-                history,
                 patternScore: metrics.patternScore,
-            }).catch(() => {
-                // IndexedDB may be unavailable; legacy saveScore above provides fallback
+                difficulty,
+                lengthCategory,
             });
-
-            if (onSessionFinished) {
-                onSessionFinished({
-                    snippetId,
-                    language,
-                    wpm: metrics.adjustedWpm,
-                    accuracy: metrics.accuracy,
-                    patternScore: metrics.patternScore,
-                    difficulty,
-                    lengthCategory,
-                });
-            }
         }
     }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, difficulty, onSessionFinished]);
 

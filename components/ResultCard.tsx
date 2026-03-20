@@ -250,7 +250,7 @@ export default function ResultCard({
                         columnGap={{ base: 4, md: 8 }}
                         rowGap={4}
                     >
-                        <StatBox label="Raw" value={Math.round(wpm / accuracy || wpm).toString()} />
+                        <StatBox label="Raw" value={Math.round(accuracy > 0 ? wpm / accuracy : wpm).toString()} />
                         <StatBox label="Characters" value={`${(contentLength ?? 0) - errors}/${errors}`} helper="correct/incorrect" />
                         <StatBox label="Time" value={formatDuration(timeMs)} />
                     </Box>

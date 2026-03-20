@@ -81,18 +81,16 @@ export async function createSessionAsync(input: CreateSessionInput): Promise<Ses
         if (await isIdbAvailable()) {
             await idbPut(STORES.sessions, record);
         }
-        // Keep localStorage mirror in sync for legacy sync readers (analytics, tests, etc).
-        const existing = readLocalStorage();
-        const updated = [record, ...existing].slice(0, MAX_RECORDS);
-        writeLocalStorage(updated);
-        return record;
     } catch {
-        // Last resort: try localStorage
-        const existing = readLocalStorage();
-        const updated = [record, ...existing].slice(0, MAX_RECORDS);
-        writeLocalStorage(updated);
-        return record;
+        // IDB failed — localStorage write below is the fallback
     }
+
+    // Always mirror to localStorage for sync readers (analytics, leaderboard)
+    const existing = readLocalStorage();
+    const updated = [record, ...existing].slice(0, MAX_RECORDS);
+    writeLocalStorage(updated);
+
+    return record;
 }
 
 export async function getSessionAsync(id: string): Promise<SessionRecord | null> {
@@ -186,7 +184,7 @@ export async function getSessionStatsAsync(filters?: Omit<SessionFilters, "limit
 
     const totalWpm = records.reduce((sum, r) => sum + r.wpm, 0);
     const totalAccuracy = records.reduce((sum, r) => sum + r.accuracy, 0);
-    const bestWpm = Math.max(...records.map((r) => r.wpm));
+    const bestWpm = records.reduce((max, r) => (r.wpm > max ? r.wpm : max), 0);
     const totalTimeMs = records.reduce((sum, r) => sum + r.elapsedMs, 0);
 
     return {
@@ -219,7 +217,7 @@ export function createSession(input: CreateSessionInput): SessionRecord | null {
         // Also write to IndexedDB in background (fire-and-forget)
         isIdbAvailable().then((ok) => {
             if (ok) idbPut(STORES.sessions, record);
-        }).catch(() => {});
+        }).catch((err) => { console.warn("Background IDB write failed for session:", record.id, err); });
 
         return record;
     } catch {
@@ -295,7 +293,7 @@ export function getSessionStats(filters?: Omit<SessionFilters, "limit" | "offset
 
     const totalWpm = records.reduce((sum, r) => sum + r.wpm, 0);
     const totalAccuracy = records.reduce((sum, r) => sum + r.accuracy, 0);
-    const bestWpm = Math.max(...records.map((r) => r.wpm));
+    const bestWpm = records.reduce((max, r) => (r.wpm > max ? r.wpm : max), 0);
     const totalTimeMs = records.reduce((sum, r) => sum + r.elapsedMs, 0);
 
     return {

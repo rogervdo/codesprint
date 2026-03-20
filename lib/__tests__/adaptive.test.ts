@@ -226,7 +226,7 @@ describe("updateSkillModel", () => {
     expect(defaultModel.sessionCount).toBe(0);
   });
 
-  it("completes full promotion flow after 3 good sessions", () => {
+  it("completes full promotion flow after 2 good sessions", () => {
     let model = getDefaultSkillModel("python");
     // Need confidence > 0.5, so set sessionCount high enough
     model = { ...model, sessionCount: 15, confidenceLevel: 0.75 };
@@ -238,18 +238,13 @@ describe("updateSkillModel", () => {
     expect(model.consecutivePromotions).toBe(1);
     expect(model.currentDifficulty).toBe("easy");
 
-    // Session 2
+    // Session 2 - should promote
     model = updateSkillModel(model, goodResult);
     expect(model.consecutivePromotions).toBe(2);
-    expect(model.currentDifficulty).toBe("easy");
-
-    // Session 3 - should promote
-    model = updateSkillModel(model, goodResult);
-    expect(model.consecutivePromotions).toBe(3);
     expect(model.currentDifficulty).toBe("medium");
   });
 
-  it("completes full demotion flow after 2 bad sessions", () => {
+  it("completes full demotion flow after 1 bad session (with updated counters)", () => {
     let model: SkillModelRecord = {
       ...getDefaultSkillModel("python"),
       currentDifficulty: "medium",
@@ -258,14 +253,9 @@ describe("updateSkillModel", () => {
 
     const badResult: SessionResult = { wpm: 20, accuracy: 0.70, difficulty: "medium" };
 
-    // Session 1
+    // Session 1 - should demote
     model = updateSkillModel(model, badResult);
     expect(model.consecutiveDemotions).toBe(1);
-    expect(model.currentDifficulty).toBe("medium");
-
-    // Session 2 - should demote
-    model = updateSkillModel(model, badResult);
-    expect(model.consecutiveDemotions).toBe(2);
     expect(model.currentDifficulty).toBe("easy");
   });
 });

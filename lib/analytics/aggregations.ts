@@ -68,13 +68,15 @@ function formatDateKey(date: Date): string {
 
 function groupByDate(sessions: SessionRecord[]): Map<string, SessionRecord[]> {
     const groups = new Map<string, SessionRecord[]>();
-
     for (const session of sessions) {
         const dateKey = formatDateKey(new Date(session.date));
-        const existing = groups.get(dateKey) ?? [];
-        groups.set(dateKey, [...existing, session]);
+        const existing = groups.get(dateKey);
+        if (existing) {
+            existing.push(session);
+        } else {
+            groups.set(dateKey, [session]);
+        }
     }
-
     return groups;
 }
 
@@ -154,8 +156,12 @@ export function getLanguageStats(range: TimeRange = "all"): LanguageStat[] {
     const byLanguage = new Map<SupportedLanguage, SessionRecord[]>();
 
     for (const session of sessions) {
-        const existing = byLanguage.get(session.language) ?? [];
-        byLanguage.set(session.language, [...existing, session]);
+        const existing = byLanguage.get(session.language);
+        if (existing) {
+            existing.push(session);
+        } else {
+            byLanguage.set(session.language, [session]);
+        }
     }
 
     const stats: LanguageStat[] = [];
@@ -164,7 +170,7 @@ export function getLanguageStats(range: TimeRange = "all"): LanguageStat[] {
         const totalWpm = languageSessions.reduce((sum, s) => sum + s.wpm, 0);
         const totalAccuracy = languageSessions.reduce((sum, s) => sum + s.accuracy, 0);
         const totalTime = languageSessions.reduce((sum, s) => sum + s.elapsedMs, 0);
-        const bestWpm = Math.max(...languageSessions.map((s) => s.wpm));
+        const bestWpm = languageSessions.reduce((max, s) => (s.wpm > max ? s.wpm : max), 0);
 
         stats.push({
             language,
@@ -213,8 +219,8 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
     const totalWpm = sessions.reduce((sum, s) => sum + s.wpm, 0);
     const totalAccuracy = sessions.reduce((sum, s) => sum + s.accuracy, 0);
     const totalTime = sessions.reduce((sum, s) => sum + s.elapsedMs, 0);
-    const bestWpm = Math.max(...sessions.map((s) => s.wpm));
-    const worstWpm = Math.min(...sessions.map((s) => s.wpm));
+    const bestWpm = sessions.reduce((max, s) => (s.wpm > max ? s.wpm : max), 0);
+    const worstWpm = sessions.length > 0 ? sessions.reduce((min, s) => (s.wpm < min ? s.wpm : min), Infinity) : 0;
 
     const byDifficulty = emptyDifficultyStats();
     const byLength = emptyLengthStats();
@@ -300,7 +306,7 @@ export function getSnippetPerformance(snippetId: string): {
 
     const totalWpm = sessions.reduce((sum, s) => sum + s.wpm, 0);
     const totalAccuracy = sessions.reduce((sum, s) => sum + s.accuracy, 0);
-    const bestWpm = Math.max(...sessions.map((s) => s.wpm));
+    const bestWpm = sessions.reduce((max, s) => (s.wpm > max ? s.wpm : max), 0);
 
     const sorted = [...sessions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const improvement =

@@ -34,7 +34,8 @@ export default function ResultGraph({ data, width = "100%", height = 300 }: Resu
         );
     }
 
-    const maxWpm = Math.max(...processedData.map((d) => Math.max(d.raw, d.burst)), 60); // Minimum scale of 60
+    const rawMax = processedData.reduce((max, d) => Math.max(max, d.raw, d.burst), 60);
+    const maxWpm = Math.ceil(rawMax / 20) * 20;
     const duration = processedData[processedData.length - 1].time;
 
     const padding = { top: 20, right: 20, bottom: 30, left: 40 };

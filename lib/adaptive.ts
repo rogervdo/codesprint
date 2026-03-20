@@ -113,8 +113,8 @@ export function updateSkillModel(
     currentDifficulty: model.currentDifficulty,
     confidenceLevel: Math.min(1, newSessionCount / 20),
     sessionCount: newSessionCount,
-    consecutivePromotions: model.consecutivePromotions,
-    consecutiveDemotions: model.consecutiveDemotions,
+    consecutivePromotions,
+    consecutiveDemotions,
   };
 
   const transition = computeDifficultyTransition(transitionModel, result);

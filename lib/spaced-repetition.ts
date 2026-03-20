@@ -115,8 +115,8 @@ export function getMasteryStatus(
   record: MasteryRecord,
   today?: string,
 ): MasteryStatus {
-  if (record.repetitions === 0) return "new";
   if (isOverdue(record, today)) return "due";
+  if (record.repetitions === 0) return "new";
   if (record.interval >= 21) return "mastered";
   return "learning";
 }
@@ -149,7 +149,7 @@ export function getDefaultMasteryRecord(
     easeFactor: 2.5,
     interval: 0,
     repetitions: 0,
-    nextReviewDate: "1970-01-01",
+    nextReviewDate: "9999-12-31",
     lastQuality: 0,
     lastReviewDate: "1970-01-01",
     bestWpm: 0,

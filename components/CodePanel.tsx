@@ -55,6 +55,17 @@ type CodePanelProps = {
     syntaxHighlighting: "full" | "partial" | "none";
 };
 
+function getPreviewIndex(content: string, cursorIndex: number): number {
+    let newlines = 0;
+    for (let i = cursorIndex; i < content.length; i++) {
+        if (content[i] === "\n") {
+            newlines++;
+            if (newlines >= 2) return i;
+        }
+    }
+    return content.length;
+}
+
 const LINE_HEIGHT_MULTIPLIER = 1.55;
 const HEIGHT_BUFFER_LINES = 4;
 const LINE_BREAK_REGEX = /\r\n|\r|\n/;
@@ -246,8 +257,7 @@ export default function CodePanel({
             },
         });
         monaco.editor.setTheme(themeName);
-        monaco.editor.setTheme(themeName);
-    }, [preferences.theme, syntaxHighlighting]);
+    }, [preferences.theme, syntaxHighlighting, editorReadyToken]);
 
     // Vim Mode Management
     useEffect(() => {
@@ -405,7 +415,7 @@ export default function CodePanel({
             previewPosition.column,
         );
 
-        editor.revealRangeIfOutsideViewport(previewRange, monaco.editor.ScrollType.Immediate);
+        editor.revealRangeNearTopIfOutsideViewport(previewRange, monaco.editor.ScrollType.Immediate);
     }, [cursorChar, content, editorReadyToken, scheduleCaretRender, triggerCaretActivity, ensureCaretNode]);
 
     useEffect(() => {
@@ -480,7 +490,6 @@ export default function CodePanel({
             }
             caretNodeRef.current = null;
             caretLayerRef.current = null;
-            caretPositionRef.current = null;
             caretPositionRef.current = null;
             caretUpdatePendingRef.current = false;
 
