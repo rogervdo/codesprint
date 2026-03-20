@@ -92,6 +92,15 @@ export function useSessionLifecycle({
         clearAutoAdvance();
     }, [snippetId, onResetEngine, clearAutoAdvance]);
 
+    // Reset the save guard whenever phase leaves "finished" so that:
+    // - Replaying the same snippet (R key) triggers a fresh save on re-completion
+    // - Backspacing out of finished and re-finishing saves with corrected metrics
+    useEffect(() => {
+        if (phase !== "finished") {
+            hasSavedRef.current = false;
+        }
+    }, [phase]);
+
     // Save score on finish
     useEffect(() => {
         if (phase !== "finished" || hasSavedRef.current) return;
