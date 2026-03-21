@@ -43,7 +43,9 @@ function useProgressSummary() {
                 streak: streakState?.currentStreak ?? 0,
                 unlockedIds: new Set(achievements.map((a) => a.id)),
             });
-        }).catch(() => {});
+        }).catch((err) => {
+            console.warn("Failed to load progress summary:", err);
+        });
     }, []);
     return data;
 }

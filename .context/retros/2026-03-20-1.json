@@ -1,0 +1,35 @@
+{
+  "date": "2026-03-20",
+  "window": "7d",
+  "metrics": {
+    "commits": 4,
+    "contributors": 2,
+    "prs_merged": 1,
+    "insertions": 241,
+    "deletions": 146,
+    "net_loc": 95,
+    "test_loc": 0,
+    "test_ratio": 0.0,
+    "active_days": 2,
+    "sessions": 3,
+    "deep_sessions": 0,
+    "avg_session_minutes": 5,
+    "loc_per_session_hour": 0,
+    "feat_pct": 0.0,
+    "fix_pct": 0.0,
+    "peak_hour": 8,
+    "ai_assisted_commits": 3
+  },
+  "authors": {
+    "Connor": { "commits": 1, "insertions": 0, "deletions": 0, "test_ratio": 0.0, "top_area": "README.md" },
+    "Claude": { "commits": 3, "insertions": 241, "deletions": 146, "test_ratio": 0.0, "top_area": "README.md" }
+  },
+  "streak_days": 0,
+  "tweetable": "Week of Mar 13: 4 commits (1 repo active), 95 net LOC, 0% tests, 1 PR, 100% AI-assisted | Streak: 0d",
+  "test_health": {
+    "total_test_files": 22,
+    "tests_added_this_period": 0,
+    "regression_test_commits": 0,
+    "test_files_changed": 0
+  }
+}

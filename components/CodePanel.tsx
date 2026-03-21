@@ -5,43 +5,10 @@ import Editor, { type OnMount } from "@monaco-editor/react";
 import { initVimMode } from "monaco-vim";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type * as Monaco from "monaco-editor";
+import { getPreviewIndex, hexToRgb, toMonacoColor, withMonacoAlpha } from "@/lib/code-panel";
 import { THEME_PRESETS, usePreferences, type SurfaceStyle } from "@/lib/preferences";
 
 type MonacoModule = typeof import("monaco-editor");
-
-function hexToRgb(hex: string): [number, number, number] {
-    const sanitized = hex.replace("#", "");
-    if (sanitized.length === 3) {
-        const r = parseInt(sanitized[0] + sanitized[0], 16);
-        const g = parseInt(sanitized[1] + sanitized[1], 16);
-        const b = parseInt(sanitized[2] + sanitized[2], 16);
-        return [r, g, b];
-    }
-    if (sanitized.length !== 6) {
-        return [0, 0, 0];
-    }
-    const numeric = parseInt(sanitized, 16);
-    const r = (numeric >> 16) & 255;
-    const g = (numeric >> 8) & 255;
-    const b = numeric & 255;
-    return [r, g, b];
-}
-
-function toMonacoColor(color: string): string {
-    if (color.startsWith("#")) return color;
-    if (color.startsWith("rgba")) {
-        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
-        if (!match) return color;
-        const r = parseInt(match[1]);
-        const g = parseInt(match[2]);
-        const b = parseInt(match[3]);
-        const a = match[4] ? parseFloat(match[4]) : 1;
-        const alphaHex = Math.round(a * 255).toString(16).padStart(2, "0");
-        const hex = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-        return a === 1 ? hex : `${hex}${alphaHex}`;
-    }
-    return color;
-}
 
 type CodePanelProps = {
     content: string;
@@ -54,17 +21,6 @@ type CodePanelProps = {
     surfaceStyle: SurfaceStyle;
     syntaxHighlighting: "full" | "partial" | "none";
 };
-
-function getPreviewIndex(content: string, cursorIndex: number): number {
-    let newlines = 0;
-    for (let i = cursorIndex; i < content.length; i++) {
-        if (content[i] === "\n") {
-            newlines++;
-            if (newlines >= 2) return i;
-        }
-    }
-    return content.length;
-}
 
 const LINE_HEIGHT_MULTIPLIER = 1.55;
 const HEIGHT_BUFFER_LINES = 4;
@@ -138,7 +94,7 @@ export default function CodePanel({
         if (!editor) return;
         const root = editor.getDomNode();
         if (!root) return;
-        const overlayLayer = root.querySelector(".view-overlays") as HTMLElement | null;
+        const overlayLayer = root.querySelector(".overflow-guard") as HTMLElement | null;
         if (!overlayLayer) return;
         const existing = caretNodeRef.current;
         if (existing && overlayLayer.contains(existing)) {
@@ -152,6 +108,7 @@ export default function CodePanel({
         caretNode.className = "cs-caret cs-caret-hidden";
         caretNode.setAttribute("aria-hidden", "true");
         caretNode.style.pointerEvents = "none";
+        caretNode.style.zIndex = "20";
         caretNode.style.setProperty("--caret-x", "0px");
         caretNode.style.setProperty("--caret-y", "0px");
         caretNode.style.setProperty("--caret-height", `${derivedLineHeight}px`);
@@ -180,9 +137,7 @@ export default function CodePanel({
                 return;
             }
             caretNode.classList.remove("cs-caret-hidden");
-            const layoutInfo = editor.getLayoutInfo();
-            const contentLeft = layoutInfo ? layoutInfo.contentLeft : 0;
-            const x = Math.max(0, coords.left - contentLeft);
+            const x = Math.max(0, coords.left);
             const y = coords.top;
             caretNode.style.setProperty("--caret-x", `${Math.round(x)}px`);
             caretNode.style.setProperty("--caret-y", `${Math.round(y)}px`);
@@ -201,62 +156,56 @@ export default function CodePanel({
         const isLight = luminance > 128;
 
         // Helper to apply 25% opacity to a color for the "untyped" state
-        const fade = (color: string) => {
-            const c = toMonacoColor(color);
-            if (c.length === 9) {
-                // Already has alpha, adjust it? simpler to just replace
-                return c.substring(0, 7) + "40";
-            }
-            return c + "40"; // Append 25% alpha (0x40)
-        };
+        const fade = (color: string) => withMonacoAlpha(color, 0.25);
 
         const themeName = `codesprint-${preferences.theme}`;
-        monaco.editor.defineTheme(themeName, {
-            base: isLight ? "vs" : "vs-dark",
-            inherit: true,
-            rules: [
-                { token: "", foreground: fade(theme.text).replace("#", "") },
-                { token: "comment", foreground: fade(theme.textSubtle).replace("#", "") },
-                // Partial highlighting logic
-                ...(syntaxHighlighting === "partial"
-                    ? [
-                        // In partial mode, we want to mute everything except keywords and types
-                        { token: "identifier", foreground: fade(theme.text).replace("#", "") },
-                        { token: "string", foreground: fade(theme.text).replace("#", "") },
-                        { token: "delimiter", foreground: fade(theme.text).replace("#", "") },
-                        { token: "number", foreground: fade(theme.text).replace("#", "") },
-                        { token: "regexp", foreground: fade(theme.text).replace("#", "") },
-                        // Keep keywords and types highlighted (using fade to ensure they match the "untyped" opacity)
-                        { token: "keyword", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "type", foreground: fade(theme.accent).replace("#", "") },
-                    ]
-                    : [
-                        // Full highlighting - be explicit to ensure coverage
-                        { token: "keyword", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "type", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "identifier", foreground: fade(theme.text).replace("#", "") },
-                        { token: "string", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "number", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "regexp", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "delimiter", foreground: fade(theme.textSubtle).replace("#", "") },
-                        { token: "delimiter.html", foreground: fade(theme.textSubtle).replace("#", "") },
-                        { token: "tag", foreground: fade(theme.accent).replace("#", "") },
-                        { token: "attribute.name", foreground: fade(theme.text).replace("#", "") },
-                        { token: "attribute.value", foreground: fade(theme.accent).replace("#", "") },
-                    ]),
-            ],
-            colors: {
-                "editor.background": "#00000000", // Transparent to allow CSS background
-                "editor.foreground": fade(theme.text),
-                "editorCursor.foreground": toMonacoColor(theme.caret),
-                "editor.lineHighlightBackground": toMonacoColor(theme.surface),
-                "editorLineNumber.foreground": toMonacoColor(theme.textSubtle),
-                "editorLineNumber.activeForeground": toMonacoColor(theme.accent),
-                "editor.selectionBackground": toMonacoColor(theme.surfaceActive),
-                "editor.inactiveSelectionBackground": toMonacoColor(theme.surface),
-            },
-        });
-        monaco.editor.setTheme(themeName);
+        try {
+            monaco.editor.defineTheme(themeName, {
+                base: isLight ? "vs" : "vs-dark",
+                inherit: true,
+                rules: [
+                    { token: "", foreground: fade(theme.text).replace("#", "") },
+                    { token: "comment", foreground: fade(theme.textSubtle).replace("#", "") },
+                    ...(syntaxHighlighting === "partial"
+                        ? [
+                            { token: "identifier", foreground: fade(theme.text).replace("#", "") },
+                            { token: "string", foreground: fade(theme.text).replace("#", "") },
+                            { token: "delimiter", foreground: fade(theme.text).replace("#", "") },
+                            { token: "number", foreground: fade(theme.text).replace("#", "") },
+                            { token: "regexp", foreground: fade(theme.text).replace("#", "") },
+                            { token: "keyword", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "type", foreground: fade(theme.accent).replace("#", "") },
+                        ]
+                        : [
+                            { token: "keyword", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "type", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "identifier", foreground: fade(theme.text).replace("#", "") },
+                            { token: "string", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "number", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "regexp", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "delimiter", foreground: fade(theme.textSubtle).replace("#", "") },
+                            { token: "delimiter.html", foreground: fade(theme.textSubtle).replace("#", "") },
+                            { token: "tag", foreground: fade(theme.accent).replace("#", "") },
+                            { token: "attribute.name", foreground: fade(theme.text).replace("#", "") },
+                            { token: "attribute.value", foreground: fade(theme.accent).replace("#", "") },
+                        ]),
+                ],
+                colors: {
+                    "editor.background": "#00000000",
+                    "editor.foreground": fade(theme.text),
+                    "editorCursor.foreground": toMonacoColor(theme.caret),
+                    "editor.lineHighlightBackground": toMonacoColor(theme.surface),
+                    "editorLineNumber.foreground": toMonacoColor(theme.textSubtle),
+                    "editorLineNumber.activeForeground": toMonacoColor(theme.accent),
+                    "editor.selectionBackground": toMonacoColor(theme.surfaceActive),
+                    "editor.inactiveSelectionBackground": toMonacoColor(theme.surface),
+                },
+            });
+            monaco.editor.setTheme(themeName);
+        } catch (error) {
+            console.error(`Failed to apply Monaco theme "${preferences.theme}"`, error);
+            monaco.editor.setTheme(isLight ? "vs" : "vs-dark");
+        }
     }, [preferences.theme, syntaxHighlighting, editorReadyToken]);
 
     // Vim Mode Management
