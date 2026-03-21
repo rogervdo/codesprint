@@ -9,7 +9,6 @@ import {
     DialogHeader,
     DialogRoot,
     DialogTitle,
-    DialogTrigger,
     Table,
     Text,
     Flex,

@@ -38,6 +38,7 @@ export default function AchievementToast({ achievements, onDismiss }: Achievemen
         );
 
         return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally depend on length, not identity
     }, [visible.length, onDismiss]);
 
     return (

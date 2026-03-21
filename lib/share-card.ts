@@ -138,7 +138,7 @@ export async function renderShareCard(data: ShareCardData): Promise<HTMLCanvasEl
         capitalize(data.difficulty),
     ];
     ctx.textAlign = "center";
-    let pillX = CARD_WIDTH / 2 - ((pillLabels.join(" · ").length * 6.5) / 2);
+    const pillX = CARD_WIDTH / 2 - ((pillLabels.join(" · ").length * 6.5) / 2);
     ctx.font = `13px ${FONT}`;
     const pillStr = pillLabels.join("  ·  ");
     ctx.fillStyle = colors.textSubtle;
