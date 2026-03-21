@@ -36,8 +36,9 @@ export function getLeaderboard(limit: number = 50): LeaderboardEntry[] {
     try {
         const stored = window.localStorage.getItem(STORAGE_KEY);
         if (!stored) return [];
-        const parsed = JSON.parse(stored) as LeaderboardEntry[];
-        return parsed.slice(0, limit);
+        const parsed = JSON.parse(stored);
+        if (!Array.isArray(parsed)) return [];
+        return (parsed as LeaderboardEntry[]).slice(0, limit);
     } catch (err) {
         console.warn("Failed to load leaderboard", err);
         return [];

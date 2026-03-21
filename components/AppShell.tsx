@@ -24,6 +24,7 @@ import PreferencesDrawer from "@/components/PreferencesDrawer";
 import ShortcutsDrawer from "@/components/ShortcutsDrawer";
 import AnalyticsModal from "@/components/AnalyticsModal";
 import AchievementGallery from "@/components/AchievementGallery";
+import { runMigrations } from "@/lib/storage/migration";
 import { getMetaValue } from "@/lib/storage/idb-store";
 import { idbGetAll, STORES, type AchievementRecord } from "@/lib/storage/idb-store";
 import { computeLevelFromXp } from "@/lib/xp";
@@ -42,7 +43,9 @@ function useProgressSummary() {
                 streak: streakState?.currentStreak ?? 0,
                 unlockedIds: new Set(achievements.map((a) => a.id)),
             });
-        }).catch(() => {});
+        }).catch((err) => {
+            console.warn("Failed to load progress summary:", err);
+        });
     }, []);
     return data;
 }
@@ -52,6 +55,12 @@ type ActiveModal = "preferences" | "shortcuts" | "analytics" | "gallery" | null;
 export function AppShell({ children }: { children: ReactNode }) {
     const [activeModal, setActiveModal] = useState<ActiveModal>(null);
     const progressSummary = useProgressSummary();
+
+    useEffect(() => {
+        runMigrations().catch((err) => {
+            console.warn("Migration failed:", err);
+        });
+    }, []);
 
     const close = useCallback(() => setActiveModal(null), []);
     const toggle = useCallback(

@@ -41,7 +41,7 @@ export function computeMetrics({ correctProgress, elapsedMs, totalTyped, totalKe
     const accuracy =
         !totalKeystrokes || totalKeystrokes <= 0
             ? 1
-            : Math.min(1, (correctKeystrokes ?? correctProgress) / totalKeystrokes);
+            : Math.min(1, (correctKeystrokes ?? 0) / totalKeystrokes);
 
     return {
         rawWpm,

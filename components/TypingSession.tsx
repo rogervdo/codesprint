@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Box, Stack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -65,7 +65,8 @@ export default function TypingSession() {
     const focus = useFocusManagement();
 
     // Session Controls (language, length, problem, snippet selection)
-    const { snippets } = useSnippets("python");
+    const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>("python");
+    const { snippets } = useSnippets(selectedLanguage);
 
     // Use a stable callback that references the ref
     const handleResetEngine = useCallback(() => {
@@ -81,6 +82,8 @@ export default function TypingSession() {
         snippets,
         onResetEngine: handleResetEngine,
         getNextRecommendation: handleGetNextRecommendation,
+        language: selectedLanguage,
+        setLanguage: setSelectedLanguage,
     });
 
     // Typing Engine

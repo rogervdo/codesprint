@@ -422,7 +422,7 @@ function ProgressChart({
     );
 }
 
-export default function AnalyticsDashboard({ onClose }: AnalyticsDashboardProps) {
+export default function AnalyticsDashboard(_props: AnalyticsDashboardProps) {
     const [timeRange, setTimeRange] = useState<TimeRange>("week");
 
     const wpmTrends = useMemo(() => getWpmTrends(timeRange), [timeRange]);

@@ -61,9 +61,21 @@ function getThemeColors(): ThemeColors {
 // Canvas rendering
 // ---------------------------------------------------------------------------
 
-const CARD_WIDTH = 600;
-const CARD_HEIGHT = 400;
-const PADDING = 32;
+const CARD_WIDTH = 1200;
+const CARD_HEIGHT = 800;
+const PADDING = 48;
+const FONT = "system-ui, -apple-system, sans-serif";
+
+function computePercentile(wpm: number): number {
+    // Rough percentile estimate based on typical typing speed distribution
+    if (wpm >= 120) return 99;
+    if (wpm >= 100) return 95;
+    if (wpm >= 80) return 85;
+    if (wpm >= 60) return 70;
+    if (wpm >= 40) return 45;
+    if (wpm >= 30) return 25;
+    return 10;
+}
 
 export async function renderShareCard(data: ShareCardData): Promise<HTMLCanvasElement> {
     const canvas = document.createElement("canvas");
@@ -74,79 +86,128 @@ export async function renderShareCard(data: ShareCardData): Promise<HTMLCanvasEl
 
     // Background
     ctx.fillStyle = colors.bg;
-    roundRect(ctx, 0, 0, CARD_WIDTH, CARD_HEIGHT, 16);
+    roundRect(ctx, 0, 0, CARD_WIDTH, CARD_HEIGHT, 24);
     ctx.fill();
 
     // Border
     ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 1;
-    roundRect(ctx, 0.5, 0.5, CARD_WIDTH - 1, CARD_HEIGHT - 1, 16);
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, 0.75, 0.75, CARD_WIDTH - 1.5, CARD_HEIGHT - 1.5, 24);
     ctx.stroke();
 
-    // Title: "CodeSprint"
-    ctx.fillStyle = colors.accent;
-    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
-    ctx.fillText("CodeSprint", PADDING, PADDING + 20);
+    // --- Hero section ---
+    const heroY = PADDING + 60;
 
-    // Problem title + meta
+    // Left: Percentile
+    const percentile = computePercentile(data.wpm);
+    ctx.textAlign = "left";
+    ctx.fillStyle = colors.accent;
+    ctx.font = `bold 48px ${FONT}`;
+    ctx.fillText(`Top ${100 - percentile}%`, PADDING, heroY);
     ctx.fillStyle = colors.textSubtle;
-    ctx.font = "14px system-ui, -apple-system, sans-serif";
-    const meta = `${data.snippetTitle}  ·  ${data.language.toUpperCase()}  ·  ${capitalize(data.difficulty)}`;
-    ctx.fillText(meta, PADDING, PADDING + 44);
+    ctx.font = `14px ${FONT}`;
+    ctx.fillText("of coders", PADDING, heroY + 24);
+
+    // Center: WPM large
+    ctx.textAlign = "center";
+    ctx.fillStyle = colors.accent;
+    ctx.font = `bold 120px ${FONT}`;
+    ctx.fillText(`${Math.round(data.wpm)}`, CARD_WIDTH / 2, heroY + 10);
+    ctx.fillStyle = colors.textSubtle;
+    ctx.font = `bold 18px ${FONT}`;
+    ctx.fillText("WPM", CARD_WIDTH / 2, heroY + 40);
+
+    // Right: Syntax score (patternScore) or accuracy label
+    const syntaxVal = data.patternScore !== undefined
+        ? `${data.patternScore}`
+        : `${Math.round(data.accuracy * 100)}%`;
+    const syntaxLabel = data.patternScore !== undefined ? "Syntax Score" : "Accuracy";
+    ctx.textAlign = "right";
+    ctx.fillStyle = colors.text;
+    ctx.font = `bold 48px ${FONT}`;
+    ctx.fillText(syntaxVal, CARD_WIDTH - PADDING, heroY);
+    ctx.fillStyle = colors.textSubtle;
+    ctx.font = `14px ${FONT}`;
+    ctx.fillText(syntaxLabel, CARD_WIDTH - PADDING, heroY + 24);
+
+    // --- Meta pills ---
+    const pillY = heroY + 80;
+    const pillLabels = [
+        data.snippetTitle,
+        data.language.toUpperCase(),
+        capitalize(data.difficulty),
+    ];
+    ctx.textAlign = "center";
+    const pillX = CARD_WIDTH / 2 - ((pillLabels.join(" · ").length * 6.5) / 2);
+    ctx.font = `13px ${FONT}`;
+    const pillStr = pillLabels.join("  ·  ");
+    ctx.fillStyle = colors.textSubtle;
+    ctx.fillText(pillStr, CARD_WIDTH / 2, pillY);
 
     // Divider
+    const dividerY = pillY + 24;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PADDING, PADDING + 60);
-    ctx.lineTo(CARD_WIDTH - PADDING, PADDING + 60);
+    ctx.moveTo(PADDING, dividerY);
+    ctx.lineTo(CARD_WIDTH - PADDING, dividerY);
     ctx.stroke();
 
-    // Stats row
-    const statsY = PADDING + 110;
-    drawStat(ctx, colors, PADDING + 60, statsY, `${Math.round(data.wpm)}`, "WPM", true);
-    drawStat(ctx, colors, PADDING + 200, statsY, `${Math.round(data.accuracy * 100)}%`, "Accuracy", false);
+    // --- Rich graph ---
+    const graphX = PADDING;
+    const graphY = dividerY + 24;
+    const graphW = CARD_WIDTH - PADDING * 2;
+    const graphH = 340;
 
-    if (data.patternScore !== undefined) {
-        drawStat(ctx, colors, PADDING + 340, statsY, `${data.patternScore}`, "Pattern", false);
-    } else {
-        drawStat(ctx, colors, PADDING + 340, statsY, formatDuration(data.timeMs), "Time", false);
-    }
-
-    // Sparkline
     if (data.history.length > 1) {
-        drawSparkline(ctx, colors, PADDING, statsY + 60, CARD_WIDTH - PADDING * 2, 100, data.history);
+        drawRichGraph(ctx, colors, graphX, graphY, graphW, graphH, data.history);
     }
 
-    // Footer
+    // --- Bottom stats row ---
+    const statsY = graphY + graphH + 40;
+    const statSpacing = (CARD_WIDTH - PADDING * 2) / 3;
+
+    // Raw WPM
+    ctx.textAlign = "center";
+    ctx.fillStyle = colors.text;
+    ctx.font = `bold 32px ${FONT}`;
+    ctx.fillText(`${Math.round(data.wpm)}`, PADDING + statSpacing * 0.5, statsY);
     ctx.fillStyle = colors.textSubtle;
-    ctx.font = "12px system-ui, -apple-system, sans-serif";
-    ctx.fillText("codesprint.dev", PADDING, CARD_HEIGHT - PADDING + 4);
+    ctx.font = `12px ${FONT}`;
+    ctx.fillText("RAW", PADDING + statSpacing * 0.5, statsY + 20);
+
+    // Accuracy
+    ctx.fillStyle = colors.text;
+    ctx.font = `bold 32px ${FONT}`;
+    ctx.fillText(`${Math.round(data.accuracy * 100)}%`, PADDING + statSpacing * 1.5, statsY);
+    ctx.fillStyle = colors.textSubtle;
+    ctx.font = `12px ${FONT}`;
+    ctx.fillText("ACCURACY", PADDING + statSpacing * 1.5, statsY + 20);
+
+    // Time
+    ctx.fillStyle = colors.text;
+    ctx.font = `bold 32px ${FONT}`;
+    ctx.fillText(formatDuration(data.timeMs), PADDING + statSpacing * 2.5, statsY);
+    ctx.fillStyle = colors.textSubtle;
+    ctx.font = `12px ${FONT}`;
+    ctx.fillText("TIME", PADDING + statSpacing * 2.5, statsY + 20);
+
+    // --- Footer ---
+    ctx.textAlign = "left";
+    ctx.fillStyle = colors.accent;
+    ctx.font = `bold 16px ${FONT}`;
+    ctx.fillText("CodeSprint", PADDING, CARD_HEIGHT - PADDING + 8);
+    ctx.fillStyle = colors.textSubtle;
+    ctx.font = `14px ${FONT}`;
+    ctx.fillText("codesprint.dev", CARD_WIDTH - PADDING, CARD_HEIGHT - PADDING + 8);
+
+    // suppress unused variable warning
+    void pillX;
 
     return canvas;
 }
 
-function drawStat(
-    ctx: CanvasRenderingContext2D,
-    colors: ThemeColors,
-    x: number,
-    y: number,
-    value: string,
-    label: string,
-    isAccent: boolean,
-) {
-    ctx.textAlign = "center";
-    ctx.fillStyle = isAccent ? colors.accent : colors.text;
-    ctx.font = "bold 36px system-ui, -apple-system, sans-serif";
-    ctx.fillText(value, x, y);
-
-    ctx.fillStyle = colors.textSubtle;
-    ctx.font = "12px system-ui, -apple-system, sans-serif";
-    ctx.fillText(label.toUpperCase(), x, y + 22);
-    ctx.textAlign = "left";
-}
-
-function drawSparkline(
+function drawRichGraph(
     ctx: CanvasRenderingContext2D,
     colors: ThemeColors,
     x: number,
@@ -158,43 +219,115 @@ function drawSparkline(
     if (history.length < 2) return;
 
     const wpmValues = history.map((h) => h.wpm);
-    const minWpm = Math.max(0, Math.min(...wpmValues) - 5);
-    const maxWpm = Math.max(...wpmValues) + 5;
+    const minWpm = Math.max(0, Math.min(...wpmValues) - 10);
+    const maxWpm = Math.max(...wpmValues) + 10;
     const range = maxWpm - minWpm || 1;
+    const peakWpm = Math.max(...wpmValues);
+    const innerPad = 32;
+    const plotX = x + innerPad;
+    const plotY = y + 12;
+    const plotW = width - innerPad * 2;
+    const plotH = height - 32;
 
     // Background area
     ctx.fillStyle = colors.surface;
-    roundRect(ctx, x, y, width, height, 8);
+    roundRect(ctx, x, y, width, height, 12);
     ctx.fill();
 
-    // Line
-    ctx.beginPath();
-    ctx.strokeStyle = colors.accent;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
+    // Grid lines (horizontal, 5 lines)
+    const gridCount = 5;
+    ctx.setLineDash([4, 6]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= gridCount; i++) {
+        const gy = plotY + (i / gridCount) * plotH;
+        const wpmLabel = Math.round(maxWpm - (i / gridCount) * range);
+        ctx.strokeStyle = colors.border;
+        ctx.beginPath();
+        ctx.moveTo(plotX, gy);
+        ctx.lineTo(plotX + plotW, gy);
+        ctx.stroke();
 
-    for (let i = 0; i < history.length; i++) {
-        const px = x + (i / (history.length - 1)) * width;
-        const py = y + height - ((history[i].wpm - minWpm) / range) * (height - 16) - 8;
-
-        if (i === 0) {
-            ctx.moveTo(px, py);
-        } else {
-            ctx.lineTo(px, py);
-        }
+        // Y-axis label with accent dot
+        ctx.setLineDash([]);
+        ctx.fillStyle = colors.accent;
+        ctx.beginPath();
+        ctx.arc(plotX - 10, gy, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = colors.textSubtle;
+        ctx.font = `11px ${FONT}`;
+        ctx.textAlign = "right";
+        ctx.fillText(`${wpmLabel}`, plotX - 16, gy + 4);
+        ctx.setLineDash([4, 6]);
     }
-    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Helper to get point coordinates
+    const ptX = (i: number) => plotX + (i / (history.length - 1)) * plotW;
+    const ptY = (wpm: number) => plotY + plotH - ((wpm - minWpm) / range) * plotH;
 
     // Gradient fill under the line
-    const gradient = ctx.createLinearGradient(x, y, x, y + height);
-    gradient.addColorStop(0, `${colors.accent}40`);
-    gradient.addColorStop(1, `${colors.accent}05`);
+    const gradient = ctx.createLinearGradient(x, plotY, x, plotY + plotH);
+    gradient.addColorStop(0, `${colors.accent}33`);
+    gradient.addColorStop(1, `${colors.accent}00`);
 
-    ctx.lineTo(x + width, y + height);
-    ctx.lineTo(x, y + height);
+    ctx.beginPath();
+    ctx.moveTo(ptX(0), ptY(history[0].wpm));
+    for (let i = 1; i < history.length; i++) {
+        ctx.lineTo(ptX(i), ptY(history[i].wpm));
+    }
+    ctx.lineTo(ptX(history.length - 1), plotY + plotH);
+    ctx.lineTo(ptX(0), plotY + plotH);
     ctx.closePath();
     ctx.fillStyle = gradient;
     ctx.fill();
+
+    // Accent line with round joins
+    ctx.beginPath();
+    ctx.strokeStyle = colors.accent;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.moveTo(ptX(0), ptY(history[0].wpm));
+    for (let i = 1; i < history.length; i++) {
+        ctx.lineTo(ptX(i), ptY(history[i].wpm));
+    }
+    ctx.stroke();
+
+    // Peak WPM dashed line
+    const peakY = ptY(peakWpm);
+    ctx.setLineDash([6, 8]);
+    ctx.strokeStyle = `${colors.accent}88`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(plotX, peakY);
+    ctx.lineTo(plotX + plotW, peakY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = colors.accent;
+    ctx.font = `bold 11px ${FONT}`;
+    ctx.textAlign = "right";
+    ctx.fillText(`Peak ${Math.round(peakWpm)} WPM`, plotX + plotW - 4, peakY - 6);
+
+    // Data point markers: outer ring + inner dot
+    for (let i = 0; i < history.length; i++) {
+        const px = ptX(i);
+        const py = ptY(history[i].wpm);
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fillStyle = colors.bg;
+        ctx.fill();
+        ctx.strokeStyle = colors.accent;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fillStyle = colors.accent;
+        ctx.fill();
+    }
 }
 
 function roundRect(
@@ -257,7 +390,9 @@ export function downloadCanvas(canvas: HTMLCanvasElement): void {
     const a = document.createElement("a");
     a.href = url;
     a.download = "codesprint-result.png";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
 }
 
 export function generateTextSummary(data: ShareCardData): string {

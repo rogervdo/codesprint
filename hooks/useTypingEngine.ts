@@ -13,6 +13,13 @@ function normalizeWhitespace(ch: string) {
     return ch === "\r" ? "\n" : ch;
 }
 
+function shouldFinishAtIndex(nextIndex: number, content: string) {
+    const isEnd = nextIndex >= content.length;
+    const isTrailingNewline = nextIndex === content.length - 1 && content[nextIndex] === "\n";
+
+    return isEnd || isTrailingNewline;
+}
+
 type UseTypingEngineProps = {
     snippet: Snippet;
     onFinish?: () => void;
@@ -257,86 +264,41 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             // Tab counts as a keystroke? Usually yes.
             setTotalKeystrokes(prev => prev + 1);
 
-            const { nextIndex: currentIndex, advanced: autoAdvanced } = autoAdvanceIndentationIfAllowed(cursorIndexRef.current);
-
-            // If auto-advance happened, we need to account for it
-            // But wait, the original logic applied updates inside the helper.
-            // Let's replicate the logic:
-
-            // If we auto-advanced, we update state and return
-            if (autoAdvanced > 0) {
-                setCursorIndex(currentIndex);
-                setTotalTypedChars(prev => prev + autoAdvanced);
-                // Auto-advance counts as correct keystrokes? 
-                // It's "free" characters. They shouldn't count as keystrokes, but they count as "correct chars" for progress.
-                // But for "Correct Keystrokes" metric, they are NOT keystrokes.
-
-                setWrongChars(prev => {
-                    if (prev.size === 0) return prev;
-                    const next = new Set(prev);
-                    for (let offset = cursorIndexRef.current; offset < currentIndex; offset++) {
-                        next.delete(offset);
-                    }
-                    return next;
-                });
-                // The original logic returned here?
-                // "return { advanced, nextIndex: target }"
-                // And then:
-                // "setCursorIndex(target); ... return { advanced, nextIndex: target };"
-                // Wait, the original logic had side effects inside `autoAdvanceIndentationIfAllowed`.
-                // I should probably just inline it or keep it as a helper that returns what to do.
-            }
-
+            const startIndex = cursorIndexRef.current;
             const content = snippetRef.current.content;
-            if (currentIndex >= content.length) return;
-
-            // Manual tab handling (if not auto-advanced or if we are at indentation point)
-            // The original logic:
-            // 1. Call autoAdvanceIndentationIfAllowed. If it advanced, it updated state.
-            // 2. Then it checked for manual tab indentation (spaces)
-
-            // Let's simplify. We'll just use the current cursorIndex from state in the next render cycle?
-            // No, we need atomic updates.
-
-            // Re-implementing the logic cleanly:
-
-            let effectiveIndex = cursorIndexRef.current;
-            let effectiveTyped = 0; // delta
+            if (startIndex >= content.length) return;
 
             // 1. Auto-advance check
-            const auto = autoAdvanceIndentationIfAllowed(effectiveIndex);
+            const auto = autoAdvanceIndentationIfAllowed(startIndex);
             if (auto.advanced > 0) {
-                effectiveIndex = auto.nextIndex;
-                effectiveTyped += auto.advanced;
+                const advancedIndex = auto.nextIndex;
 
                 // Apply updates for auto-advance
-                cursorIndexRef.current = effectiveIndex;
-                setCursorIndex(effectiveIndex);
+                cursorIndexRef.current = advancedIndex;
+                setCursorIndex(advancedIndex);
                 setTotalTypedChars(prev => prev + auto.advanced);
                 setWrongChars(prev => {
                     if (prev.size === 0) return prev;
                     const next = new Set(prev);
-                    for (let i = cursorIndexRef.current; i < effectiveIndex; i++) next.delete(i);
+                    for (let i = startIndex; i < advancedIndex; i++) next.delete(i);
                     return next;
                 });
 
-                // Original code returned here if advanced > 0
                 return;
             }
 
             // 2. Manual Tab (spaces)
-            // content is already defined above
             let advanced = 0;
             while (
                 advanced < INDENT_WIDTH &&
-                effectiveIndex + advanced < content.length &&
-                content[effectiveIndex + advanced] === " "
+                startIndex + advanced < content.length &&
+                content[startIndex + advanced] === " "
             ) {
                 advanced += 1;
             }
 
             if (advanced > 0) {
-                cursorIndexRef.current = effectiveIndex + advanced;
+                cursorIndexRef.current = startIndex + advanced;
                 setCursorIndex(cursorIndexRef.current);
                 setTotalTypedChars(prev => prev + advanced);
                 // Manual tab is a correct action
@@ -344,23 +306,23 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 setWrongChars(prev => {
                     if (prev.size === 0) return prev;
                     const next = new Set(prev);
-                    for (let i = 0; i < advanced; i++) next.delete(effectiveIndex + i);
+                    for (let i = 0; i < advanced; i++) next.delete(startIndex + i);
                     return next;
                 });
                 return;
             }
 
             // 3. Manual Tab (literal tab character)
-            const expected = snippetRef.current.content[effectiveIndex];
+            const expected = content[startIndex];
             if (expected === "\t") {
-                cursorIndexRef.current = effectiveIndex + 1;
+                cursorIndexRef.current = startIndex + 1;
                 setCursorIndex(cursorIndexRef.current);
                 setTotalTypedChars(prev => prev + 1);
                 setCorrectKeystrokes(prev => prev + 1);
                 setWrongChars(prev => {
-                    if (!prev.has(effectiveIndex)) return prev;
+                    if (!prev.has(startIndex)) return prev;
                     const next = new Set(prev);
-                    next.delete(effectiveIndex);
+                    next.delete(startIndex);
                     return next;
                 });
             }
@@ -455,17 +417,6 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 next.delete(currentIndex);
                 return next;
             });
-
-            // Check for completion immediately after a correct keystroke
-            const nextIdx = newCursor;
-            const snippetContent = snippetRef.current.content;
-            const isEnd = nextIdx >= snippetContent.length;
-            const isTrailingNewline = nextIdx === snippetContent.length - 1 && snippetContent[nextIdx] === "\n";
-
-            if (isEnd || isTrailingNewline) {
-                setPhase("finished");
-                if (onFinish) onFinish();
-            }
         } else {
             setWrongChars(prev => new Set(prev).add(currentIndex));
             setLastErrorAt(timestamp);
@@ -475,6 +426,11 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 if (next.length > 200) next.shift();
                 return next;
             });
+        }
+
+        if (shouldFinishAtIndex(newCursor, snippetRef.current.content)) {
+            setPhase("finished");
+            if (onFinish) onFinish();
         }
 
     }, [autoAdvanceIndentationIfAllowed, onFinish, preferences.vimMode]);

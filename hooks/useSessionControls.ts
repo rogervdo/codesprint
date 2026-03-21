@@ -19,6 +19,8 @@ export interface UseSessionControlsProps {
     snippets: Snippet[];
     onResetEngine: () => void;
     getNextRecommendation?: (availableIds: string[], currentId: string) => string | null;
+    language: SupportedLanguage;
+    setLanguage: (lang: SupportedLanguage) => void;
 }
 
 export interface UseSessionControlsReturn {
@@ -80,8 +82,9 @@ export function useSessionControls({
     snippets,
     onResetEngine,
     getNextRecommendation,
+    language,
+    setLanguage,
 }: UseSessionControlsProps): UseSessionControlsReturn {
-    const [language, setLanguage] = useState<SupportedLanguage>("python");
     const [lengthPreference, setLengthPreference] = useState<LengthFilter>("short");
     const recentProblemIdsRef = useRef<string[]>([]);
     const recentVarianceTagsRef = useRef<string[]>([]);

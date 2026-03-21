@@ -64,7 +64,7 @@ function GridLines({
     dimensions: ChartDimensions;
     maxWpm: number;
 }) {
-    const { padding, innerWidth, innerHeight, width } = dimensions;
+    const { padding, innerHeight, width } = dimensions;
     const gridLevels = [0, 0.5, 1];
 
     return (

@@ -115,56 +115,35 @@ export function PreferencesProvider({
 
     useEffect(() => {
         if (!hydrated || typeof window === "undefined") return;
-        try {
-            const storage = window.localStorage;
-            if (storage.getItem(LIVE_STATS_MIGRATION_KEY)) return;
-            setPreferences((prev) => {
-                storage.setItem(LIVE_STATS_MIGRATION_KEY, "1");
-                if (prev.showLiveStatsDuringRun) {
-                    return prev;
-                }
-                return { ...prev, showLiveStatsDuringRun: true };
-            });
-        } catch (err) {
-            console.warn("Failed to migrate live stats preference", err);
-        }
-    }, [hydrated, setPreferences]);
+        const storage = window.localStorage;
 
-    useEffect(() => {
-        if (!hydrated || typeof window === "undefined") return;
-        try {
-            const storage = window.localStorage;
-            if (storage.getItem(COUNTDOWN_MIGRATION_KEY)) return;
-            setPreferences((prev) => {
-                storage.setItem(COUNTDOWN_MIGRATION_KEY, "1");
-                // Migrate countdownEnabled from true (old default) to false (new default)
-                if (prev.countdownEnabled === true) {
-                    return { ...prev, countdownEnabled: false };
+        setPreferences((prev) => {
+            try {
+                let next = prev;
+                if (!storage.getItem(LIVE_STATS_MIGRATION_KEY)) {
+                    storage.setItem(LIVE_STATS_MIGRATION_KEY, "1");
+                    if (!next.showLiveStatsDuringRun) {
+                        next = { ...next, showLiveStatsDuringRun: true };
+                    }
                 }
-                return prev;
-            });
-        } catch (err) {
-            console.warn("Failed to migrate countdown preference", err);
-        }
-    }, [hydrated, setPreferences]);
-
-    useEffect(() => {
-        if (!hydrated || typeof window === "undefined") return;
-        try {
-            const storage = window.localStorage;
-            if (storage.getItem(VIM_MODE_MIGRATION_KEY)) return;
-            setPreferences((prev) => {
-                storage.setItem(VIM_MODE_MIGRATION_KEY, "1");
-                // Disable vim mode by default - it was causing confusion
-                if (prev.vimMode === true) {
-                    return { ...prev, vimMode: false };
+                if (!storage.getItem(COUNTDOWN_MIGRATION_KEY)) {
+                    storage.setItem(COUNTDOWN_MIGRATION_KEY, "1");
+                    if (next.countdownEnabled === true) {
+                        next = { ...next, countdownEnabled: false };
+                    }
                 }
+                if (!storage.getItem(VIM_MODE_MIGRATION_KEY)) {
+                    storage.setItem(VIM_MODE_MIGRATION_KEY, "1");
+                    if (next.vimMode === true) {
+                        next = { ...next, vimMode: false };
+                    }
+                }
+                return next;
+            } catch {
                 return prev;
-            });
-        } catch (err) {
-            console.warn("Failed to migrate vim mode preference", err);
-        }
-    }, [hydrated, setPreferences]);
+            }
+        });
+    }, [hydrated]);
 
     useEffect(() => {
         applyTheme(preferences);

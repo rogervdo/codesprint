@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(bunx playwright:*)",
+      "Bash(./node_modules/.bin/vitest run:*)"
+    ]
+  }
+}

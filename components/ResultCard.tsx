@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 const MotionBox = motion(Box);
 const MotionFlex = motion(Flex);
-import { usePrefersReducedMotion } from "@/lib/motion";
 import ResultGraph, { type ResultGraphPoint } from "./ResultGraph";
 import type { Token } from "@/lib/tokenizer";
 import type { WeakPattern } from "@/lib/pattern-analysis";
@@ -48,25 +47,6 @@ function capitalize(value: string) {
     return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.08,
-            delayChildren: 0.1,
-        },
-    },
-};
-
-const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { type: "spring", stiffness: 280, damping: 24 }
-    },
-} as const;
 
 export default function ResultCard({
     wpm,
@@ -89,7 +69,6 @@ export default function ResultCard({
     const [countdown, setCountdown] = useState<number | null>(null);
     const [isSharing, setIsSharing] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
-    const prefersReducedMotion = usePrefersReducedMotion();
 
     useEffect(() => {
         if (!autoAdvanceDeadline) {
@@ -160,14 +139,6 @@ export default function ResultCard({
         ],
         [difficulty, language, lengthCategory, snippetId, snippetTitle]
     );
-
-    const animationProps = prefersReducedMotion ? {} : {
-        variants: containerVariants,
-        initial: "hidden",
-        animate: "visible"
-    };
-
-    const itemProps = prefersReducedMotion ? {} : { variants: itemVariants };
 
     // Simple normal distribution approximation for WPM percentiles
     // Mean ~40 WPM, SD ~15 for general population.
@@ -250,7 +221,7 @@ export default function ResultCard({
                         columnGap={{ base: 4, md: 8 }}
                         rowGap={4}
                     >
-                        <StatBox label="Raw" value={Math.round(wpm / accuracy || wpm).toString()} />
+                        <StatBox label="Raw" value={Math.round(accuracy > 0 ? wpm / accuracy : wpm).toString()} />
                         <StatBox label="Characters" value={`${(contentLength ?? 0) - errors}/${errors}`} helper="correct/incorrect" />
                         <StatBox label="Time" value={formatDuration(timeMs)} />
                     </Box>

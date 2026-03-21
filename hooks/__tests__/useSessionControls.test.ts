@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+import { useState } from "react";
 import { useSessionControls } from "../useSessionControls";
-import { CURATED_SNIPPETS_LIST, type Snippet } from "@/lib/snippets";
+import { CURATED_SNIPPETS_LIST, type Snippet, type SupportedLanguage } from "@/lib/snippets";
 
 function makeSnippet(overrides: Partial<Snippet> = {}): Snippet {
     return {
@@ -21,9 +22,10 @@ describe("useSessionControls", () => {
     const mockResetEngine = vi.fn();
 
     function renderControls(snippets = CURATED_SNIPPETS_LIST) {
-        return renderHook(() =>
-            useSessionControls({ snippets, onResetEngine: mockResetEngine })
-        );
+        return renderHook(() => {
+            const [language, setLanguage] = useState<SupportedLanguage>("python");
+            return useSessionControls({ snippets, onResetEngine: mockResetEngine, language, setLanguage });
+        });
     }
 
     it("initializes with default language (python) and length (short)", () => {
