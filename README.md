@@ -16,12 +16,7 @@
 
 <br>
 
-<figure>
-  <img src="https://github.com/user-attachments/assets/0fa880d2-714c-47cf-9c58-218524943d60" alt="CodeSprint demo" width="100%">
-  <figcaption><sub>Typing a LeetCode two-pointer solution in Python with live syntax scoring.</sub></figcaption>
-</figure>
-
-<br>
+<img src="https://github.com/user-attachments/assets/0fa880d2-714c-47cf-9c58-218524943d60" alt="CodeSprint demo" width="100%">
 
 <strong>A code typing trainer that builds real syntax muscle memory.</strong>
 <br>
@@ -32,8 +27,6 @@ Practice 1,800+ real LeetCode snippets across Python, JavaScript, Java, and C++<
 </p>
 
 </div>
-
-<br>
 
 ## Why?
 
