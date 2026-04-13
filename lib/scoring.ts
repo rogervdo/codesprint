@@ -3,6 +3,7 @@
 import type { Token } from "./tokenizer";
 import { buildCategoryMap } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
+import type { TokenWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
 
 export type Metrics = {
@@ -54,6 +55,29 @@ export function computeMetrics({ correctProgress, elapsedMs, totalTyped, totalKe
 // Pattern Score
 // ---------------------------------------------------------------------------
 
+/** Compute totalWeight from tokens directly — O(numTokens) instead of O(numChars). */
+function totalWeightFromTokens(tokens: Token[], weights: TokenWeights): number {
+    let total = 0;
+    for (let t = 0; t < tokens.length; t++) {
+        const tok = tokens[t];
+        total += weights[tok.category] * (tok.end - tok.start);
+    }
+    return total;
+}
+
+/** Binary search tokens for the weight at a given position. */
+function weightAtPosition(tokens: Token[], pos: number, weights: TokenWeights): number {
+    let lo = 0, hi = tokens.length - 1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >>> 1;
+        const tok = tokens[mid];
+        if (pos < tok.start) hi = mid - 1;
+        else if (pos >= tok.end) lo = mid + 1;
+        else return weights[tok.category];
+    }
+    return weights.whitespace;
+}
+
 type PatternScoreInput = {
     /** Error positions in the content string */
     errorPositions: number[];
@@ -80,23 +104,17 @@ export function computePatternScore({
 }: PatternScoreInput): number {
     if (tokens.length === 0 || contentLength === 0) return 100;
 
-    const categoryMap = buildCategoryMap(tokens, contentLength);
     const weights = getCachedWeights(language);
 
-    // Total weighted characters
-    let totalWeight = 0;
-    for (let i = 0; i < contentLength; i++) {
-        totalWeight += weights[categoryMap[i]];
-    }
-
+    const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) return 100;
 
-    // Weighted errors — iterate sparse error list directly (no Set allocation)
+    // Weighted errors via binary search (no categoryMap allocation)
     let errorWeight = 0;
     for (let j = 0; j < errorPositions.length; j++) {
         const pos = errorPositions[j];
         if (pos >= 0 && pos < contentLength) {
-            errorWeight += weights[categoryMap[pos]];
+            errorWeight += weightAtPosition(tokens, pos, weights);
         }
     }
 
@@ -128,16 +146,23 @@ export function createPatternScoreCalculator({
         return () => 100;
     }
 
-    const categoryMap = buildCategoryMap(tokens, contentLength);
     const weights = getCachedWeights(language);
 
-    let totalWeight = 0;
-    for (let i = 0; i < contentLength; i++) {
-        totalWeight += weights[categoryMap[i]];
-    }
-
+    const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         return () => 100;
+    }
+
+    // Build a Float64Array weight map for fast O(1) lookups in the closure
+    const weightMap = new Float64Array(contentLength);
+    weightMap.fill(weights.whitespace);
+    for (let t = 0; t < tokens.length; t++) {
+        const tok = tokens[t];
+        const w = weights[tok.category];
+        const end = Math.min(tok.end, contentLength);
+        for (let i = tok.start; i < end; i++) {
+            weightMap[i] = w;
+        }
     }
 
     return (errorPositions: number[]): number => {
@@ -146,7 +171,7 @@ export function createPatternScoreCalculator({
         for (let j = 0; j < errorPositions.length; j++) {
             const pos = errorPositions[j];
             if (pos >= 0 && pos < contentLength) {
-                errorWeight += weights[categoryMap[pos]];
+                errorWeight += weightMap[pos];
             }
         }
         const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
