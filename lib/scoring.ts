@@ -73,17 +73,19 @@ type PatternScoreInput = {
 // Named property cache — faster than Symbol in JSC (hidden class optimized)
 export function computePatternScore(input: PatternScoreInput): number {
     const c = (input.tokens as any)._$psc;
-    if (c && c[0] === input.errorPositions) return c[1];
-    // Pass fields individually so JSC can escape-analyze the input object
-    return _computePatternScoreCold(input.tokens, input.errorPositions, input.contentLength, input.language);
+    return c && c[0] === input.errorPositions ? c[1] : _computePatternScoreCold(input);
 }
 
-function _computePatternScoreCold(tokens: Token[], errorPositions: number[], contentLength: number, language: SupportedLanguage): number {
-    if (tokens.length === 0 || contentLength === 0) return 100;
+function _computePatternScoreCold(input: PatternScoreInput): number {
+    const tokens = input.tokens;
+    if (tokens.length === 0 || input.contentLength === 0) return 100;
 
-    const weights = getCachedWeights(language);
+    const weights = getCachedWeights(input.language);
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) return 100;
+
+    const errorPositions = input.errorPositions;
+    const contentLength = input.contentLength;
     let errorWeight = 0;
     for (let j = 0; j < errorPositions.length; j++) {
         const pos = errorPositions[j];
@@ -112,21 +114,19 @@ export function createPatternScoreCalculator(
     input: PatternScoreCalculatorInput
 ): (errorPositions: number[]) => number {
     const ta = input.tokens as any;
-    if (ta._$calc) return ta._$calc;
-    return _createCalcCold(input.tokens, input.contentLength, input.language, ta);
+    return ta._$calc || _createCalcCold(input, ta);
 }
 
 function _createCalcCold(
-    tokens: Token[],
-    contentLength: number,
-    language: SupportedLanguage,
+    input: PatternScoreCalculatorInput,
     ta: any,
 ): (errorPositions: number[]) => number {
-    if (tokens.length === 0 || contentLength === 0) {
+    const tokens = input.tokens;
+    if (tokens.length === 0 || input.contentLength === 0) {
         return () => 100;
     }
 
-    const weights = getCachedWeights(language);
+    const weights = getCachedWeights(input.language);
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;
@@ -134,6 +134,7 @@ function _createCalcCold(
         return fn;
     }
 
+    const contentLength = input.contentLength;
     let lastKey: number[] | null = null;
     let lastVal = 0;
 
