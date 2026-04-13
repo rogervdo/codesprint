@@ -62,6 +62,10 @@ const CAT_INDEX: Record<TokenCategory, number> = {
 const errCts = new Int32Array(NUM_CATEGORIES);
 const totCts = new Int32Array(NUM_CATEGORIES);
 
+// Single-entry cache via Symbols
+const _wpKey = Symbol('wp-k');
+const _wpVal = Symbol('wp-v');
+
 // ---------------------------------------------------------------------------
 // Analysis
 // ---------------------------------------------------------------------------
@@ -71,8 +75,6 @@ const totCts = new Int32Array(NUM_CATEGORIES);
  *
  * Returns the top N weakest categories sorted by weighted error rate.
  */
-const _wpSym = Symbol('wp');
-
 export function analyzeWeakPatterns(
     errors: ErrorEntry[],
     tokens: Token[],
@@ -82,11 +84,9 @@ export function analyzeWeakPatterns(
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
-    const cache = (tokens as any)[_wpSym] as Map<ErrorEntry[], WeakPattern[]> | undefined;
-    if (cache) {
-        const cached = cache.get(errors);
-        if (cached) return cached;
-    }
+    // Single-entry cache: check if same errors ref
+    const ta = tokens as any;
+    if (ta[_wpKey] === errors) return ta[_wpVal];
 
     const weights = getCachedWeights(language);
 
@@ -139,13 +139,8 @@ export function analyzeWeakPatterns(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    if (cache) {
-        cache.set(errors, result);
-    } else {
-        const m = new Map<ErrorEntry[], WeakPattern[]>();
-        m.set(errors, result);
-        (tokens as any)[_wpSym] = m;
-    }
+    ta[_wpKey] = errors;
+    ta[_wpVal] = result;
 
     return result;
 }

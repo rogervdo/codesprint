@@ -95,8 +95,9 @@ type PatternScoreInput = {
  * Higher score = fewer errors on high-weight tokens.
  * A perfect run = 100.
  */
-// Symbol-based caching (faster than WeakMap — avoids hash lookup)
-const _pscSym = Symbol('psc');
+// Single-entry cache via Symbols (avoids Map overhead)
+const _pscKey = Symbol('psc-k');
+const _pscVal = Symbol('psc-v');
 
 export function computePatternScore({
     errorPositions,
@@ -106,11 +107,9 @@ export function computePatternScore({
 }: PatternScoreInput): number {
     if (tokens.length === 0 || contentLength === 0) return 100;
 
-    const cache = (tokens as any)[_pscSym] as Map<number[], number> | undefined;
-    if (cache) {
-        const cached = cache.get(errorPositions);
-        if (cached !== undefined) return cached;
-    }
+    // Single-entry cache: check if same errorPositions ref
+    const ta = tokens as any;
+    if (ta[_pscKey] === errorPositions) return ta[_pscVal];
 
     const weights = getCachedWeights(language);
     const totalWeight = totalWeightFromTokens(tokens, weights);
@@ -127,13 +126,8 @@ export function computePatternScore({
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     const result = Math.max(0, Math.min(100, score));
 
-    if (cache) {
-        cache.set(errorPositions, result);
-    } else {
-        const m = new Map<number[], number>();
-        m.set(errorPositions, result);
-        (tokens as any)[_pscSym] = m;
-    }
+    ta[_pscKey] = errorPositions;
+    ta[_pscVal] = result;
 
     return result;
 }
@@ -164,24 +158,25 @@ export function createPatternScoreCalculator({
         return () => 100;
     }
 
-    const cachedCalc = (tokens as any)[_calcSym] as ((e: number[]) => number) | undefined;
-    if (cachedCalc) return cachedCalc;
+    const ta = tokens as any;
+    if (ta[_calcSym]) return ta[_calcSym];
 
     const weights = getCachedWeights(language);
 
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;
-        (tokens as any)[_calcSym] = fn;
+        ta[_calcSym] = fn;
         return fn;
     }
 
-    const innerCache = new Map<number[], number>();
+    // Single-entry last-result cache for inner function
+    let lastKey: number[] | null = null;
+    let lastVal = 0;
 
     const fn = (errorPositions: number[]): number => {
         if (errorPositions.length === 0) return 100;
-        const cached = innerCache.get(errorPositions);
-        if (cached !== undefined) return cached;
+        if (lastKey === errorPositions) return lastVal;
 
         let errorWeight = 0;
         for (let j = 0; j < errorPositions.length; j++) {
@@ -192,10 +187,11 @@ export function createPatternScoreCalculator({
         }
         const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
         const result = Math.max(0, Math.min(100, score));
-        innerCache.set(errorPositions, result);
+        lastKey = errorPositions;
+        lastVal = result;
         return result;
     };
 
-    (tokens as any)[_calcSym] = fn;
+    ta[_calcSym] = fn;
     return fn;
 }
