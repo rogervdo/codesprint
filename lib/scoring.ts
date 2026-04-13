@@ -83,22 +83,22 @@ export function computePatternScore({
     const categoryMap = buildCategoryMap(tokens, contentLength);
     const weights = getWeights(language);
 
-    // Total weighted characters and weighted errors
+    // Total weighted characters
     let totalWeight = 0;
-    let errorWeight = 0;
-
-    const errorSet = new Set(errorPositions);
-
     for (let i = 0; i < contentLength; i++) {
-        const category = categoryMap[i];
-        const w = weights[category];
-        totalWeight += w;
-        if (errorSet.has(i)) {
-            errorWeight += w;
-        }
+        totalWeight += weights[categoryMap[i]];
     }
 
     if (totalWeight === 0) return 100;
+
+    // Weighted errors — iterate sparse error list directly (no Set allocation)
+    let errorWeight = 0;
+    for (let j = 0; j < errorPositions.length; j++) {
+        const pos = errorPositions[j];
+        if (pos >= 0 && pos < contentLength) {
+            errorWeight += weights[categoryMap[pos]];
+        }
+    }
 
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     return Math.max(0, Math.min(100, score));
@@ -143,8 +143,8 @@ export function createPatternScoreCalculator({
     return (errorPositions: number[]): number => {
         if (errorPositions.length === 0) return 100;
         let errorWeight = 0;
-        const errorSet = new Set(errorPositions);
-        for (const pos of errorSet) {
+        for (let j = 0; j < errorPositions.length; j++) {
+            const pos = errorPositions[j];
             if (pos >= 0 && pos < contentLength) {
                 errorWeight += weights[categoryMap[pos]];
             }
