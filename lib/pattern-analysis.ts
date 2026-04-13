@@ -71,9 +71,7 @@ const _wpVal = Symbol('wp-v');
 // ---------------------------------------------------------------------------
 
 /**
- * Analyze error patterns against token categories.
- *
- * Returns the top N weakest categories sorted by weighted error rate.
+ * Analyze error patterns — tiny hot path for JIT inlining.
  */
 export function analyzeWeakPatterns(
     errors: ErrorEntry[],
@@ -82,10 +80,19 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    // Cache check first — hot path avoids all other checks
     const ta = tokens as any;
     if (ta[_wpKey] === errors) return ta[_wpVal];
+    return _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN, ta);
+}
 
+function _analyzeWeakPatternsCold(
+    errors: ErrorEntry[],
+    tokens: Token[],
+    contentLength: number,
+    language: SupportedLanguage,
+    topN: number,
+    ta: any,
+): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
     const weights = getCachedWeights(language);

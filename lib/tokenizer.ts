@@ -290,7 +290,10 @@ const _cmSym = Symbol('cm');
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
     const cached = (tokens as any)[_cmSym];
     if (cached) return cached;
+    return _buildCategoryMapCold(tokens, length);
+}
 
+function _buildCategoryMapCold(tokens: Token[], length: number): TokenCategory[] {
     const map: TokenCategory[] = new Array(length);
     for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];

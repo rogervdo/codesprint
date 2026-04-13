@@ -88,20 +88,16 @@ type PatternScoreInput = {
     language: SupportedLanguage;
 };
 
-// Single-entry cache via Symbols
-const _pscKey = Symbol('psc-k');
-const _pscVal = Symbol('psc-v');
+// Single tuple cache [key, value] — 1 Symbol read per cache hit instead of 2
+const _psc = Symbol('psc');
 
-/**
- * Compute a pattern score (0-100) — tiny hot path for JIT inlining.
- */
 export function computePatternScore(input: PatternScoreInput): number {
-    const ta = input.tokens as any;
-    if (ta[_pscKey] === input.errorPositions) return ta[_pscVal];
-    return _computePatternScoreCold(input, ta);
+    const c = (input.tokens as any)[_psc];
+    if (c !== undefined && c[0] === input.errorPositions) return c[1];
+    return _computePatternScoreCold(input);
 }
 
-function _computePatternScoreCold(input: PatternScoreInput, ta: any): number {
+function _computePatternScoreCold(input: PatternScoreInput): number {
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) return 100;
 
@@ -121,10 +117,7 @@ function _computePatternScoreCold(input: PatternScoreInput, ta: any): number {
 
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     const result = Math.max(0, Math.min(100, score));
-
-    ta[_pscKey] = errorPositions;
-    ta[_pscVal] = result;
-
+    (tokens as any)[_psc] = [errorPositions, result];
     return result;
 }
 
