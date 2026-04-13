@@ -88,22 +88,20 @@ type PatternScoreInput = {
     language: SupportedLanguage;
 };
 
-/**
- * Compute a pattern score (0-100) that reflects how well the user typed
- * syntax-significant tokens.
- *
- * Higher score = fewer errors on high-weight tokens.
- * A perfect run = 100.
- */
-// Single-entry cache via Symbols (avoids Map overhead)
+// Single-entry cache via Symbols
 const _pscKey = Symbol('psc-k');
 const _pscVal = Symbol('psc-v');
 
+/**
+ * Compute a pattern score (0-100) — tiny hot path for JIT inlining.
+ */
 export function computePatternScore(input: PatternScoreInput): number {
-    // Cache check first — hot path avoids all other checks
     const ta = input.tokens as any;
     if (ta[_pscKey] === input.errorPositions) return ta[_pscVal];
+    return _computePatternScoreCold(input, ta);
+}
 
+function _computePatternScoreCold(input: PatternScoreInput, ta: any): number {
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) return 100;
 
@@ -140,27 +138,29 @@ type PatternScoreCalculatorInput = {
     language: SupportedLanguage;
 };
 
-/**
- * Creates a reusable pattern score calculator that caches the categoryMap and
- * totalWeight for a given snippet. Call this once per snippet and reuse the
- * returned function on every keystroke interval to avoid rebuilding the map.
- */
 const _calcSym = Symbol('calc');
 
+/**
+ * Creates a reusable pattern score calculator — tiny hot path for JIT inlining.
+ */
 export function createPatternScoreCalculator(
     input: PatternScoreCalculatorInput
 ): (errorPositions: number[]) => number {
-    // Cache check first — hot path
     const ta = input.tokens as any;
     if (ta[_calcSym]) return ta[_calcSym];
+    return _createCalcCold(input, ta);
+}
 
+function _createCalcCold(
+    input: PatternScoreCalculatorInput,
+    ta: any,
+): (errorPositions: number[]) => number {
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) {
         return () => 100;
     }
 
     const weights = getCachedWeights(input.language);
-
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;

@@ -288,8 +288,8 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
 const _cmSym = Symbol('cm');
 
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    const cached = (tokens as any)[_cmSym] as TokenCategory[] | undefined;
-    if (cached && cached.length === length) return cached;
+    const cached = (tokens as any)[_cmSym];
+    if (cached) return cached;
 
     const map: TokenCategory[] = new Array(length);
     for (let t = 0; t < tokens.length; t++) {
