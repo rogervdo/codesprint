@@ -2,7 +2,7 @@
 
 import type { Token } from "./tokenizer";
 import { buildCategoryMap } from "./tokenizer";
-import { getWeights } from "./token-weights";
+import { getCachedWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
 
 export type Metrics = {
@@ -81,7 +81,7 @@ export function computePatternScore({
     if (tokens.length === 0 || contentLength === 0) return 100;
 
     const categoryMap = buildCategoryMap(tokens, contentLength);
-    const weights = getWeights(language);
+    const weights = getCachedWeights(language);
 
     // Total weighted characters
     let totalWeight = 0;
@@ -129,7 +129,7 @@ export function createPatternScoreCalculator({
     }
 
     const categoryMap = buildCategoryMap(tokens, contentLength);
-    const weights = getWeights(language);
+    const weights = getCachedWeights(language);
 
     let totalWeight = 0;
     for (let i = 0; i < contentLength; i++) {

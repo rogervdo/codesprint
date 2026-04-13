@@ -8,7 +8,7 @@
 
 import type { Token, TokenCategory } from "./tokenizer";
 import { buildCategoryMap } from "./tokenizer";
-import { getWeights } from "./token-weights";
+import { getCachedWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ export function analyzeWeakPatterns(
     if (errors.length === 0 || tokens.length === 0) return [];
 
     const categoryMap = buildCategoryMap(tokens, contentLength);
-    const weights = getWeights(language);
+    const weights = getCachedWeights(language);
 
     // Count errors per category
     const errorsByCategory = new Map<TokenCategory, number>();
