@@ -164,6 +164,13 @@ for (let c = 0; c < 128; c++) {
  */
 // Memoization cache: plain object for faster string-key lookup
 const _tokenizeCache: Record<string, Token[]> = Object.create(null);
+let _nextTokenId = 0;
+
+// Global array caches indexed by token ID — avoids named property access on token arrays
+export const _cmCache: (TokenCategory[] | null)[] = [];
+export const _pscCache: ([number[], number] | null)[] = [];
+export const _calcCache: (((ep: number[]) => number) | null)[] = [];
+export const _wpCache: ([any[], any] | null)[] = [];
 
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
     return _tokenizeCache[content] || _tokenizeImpl(content, language);
@@ -172,12 +179,8 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
 function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
-    // Pre-define cache slots for monomorphic hidden class across all token arrays
-    const ta = tokens as any;
-    ta._$psc = undefined;
-    ta._$calc = undefined;
-    ta._$cm = undefined;
-    ta._$wp = undefined;
+    // Assign numeric ID for fast global array-indexed caching
+    (tokens as any)._id = _nextTokenId++;
     const len = content.length;
     let i = 0;
 
@@ -290,10 +293,11 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
  * This enables O(1) lookups during scoring.
  */
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    return (tokens as any)._$cm || _buildCategoryMapCold(tokens, length);
+    const id = (tokens as any)._id;
+    return _cmCache[id] || _buildCategoryMapCold(tokens, length, id);
 }
 
-function _buildCategoryMapCold(tokens: Token[], length: number): TokenCategory[] {
+function _buildCategoryMapCold(tokens: Token[], length: number, id: number): TokenCategory[] {
     const map: TokenCategory[] = new Array(length);
     for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
@@ -303,6 +307,6 @@ function _buildCategoryMapCold(tokens: Token[], length: number): TokenCategory[]
             map[i] = cat;
         }
     }
-    (tokens as any)._$cm = map;
+    _cmCache[id] = map;
     return map;
 }

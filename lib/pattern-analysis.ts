@@ -7,6 +7,7 @@
  */
 
 import type { Token, TokenCategory } from "./tokenizer";
+import { _wpCache } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
 
@@ -73,8 +74,9 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    const c = (tokens as any)._$wp;
-    return c && c[0] === errors ? c[1] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
+    const id = (tokens as any)._id;
+    const c = _wpCache[id];
+    return c && c[0] === errors ? c[1] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN, id);
 }
 
 function _analyzeWeakPatternsCold(
@@ -83,6 +85,7 @@ function _analyzeWeakPatternsCold(
     contentLength: number,
     language: SupportedLanguage,
     topN: number,
+    id: number,
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
@@ -137,7 +140,7 @@ function _analyzeWeakPatternsCold(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    (tokens as any)._$wp = [errors, result];
+    _wpCache[id] = [errors, result];
 
     return result;
 }

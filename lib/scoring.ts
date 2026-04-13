@@ -1,6 +1,7 @@
 "use client";
 
 import type { Token } from "./tokenizer";
+import { _pscCache, _calcCache } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
 import type { TokenWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
@@ -72,11 +73,12 @@ type PatternScoreInput = {
 
 // Named property cache — faster than Symbol in JSC (hidden class optimized)
 export function computePatternScore(input: PatternScoreInput): number {
-    const c = (input.tokens as any)._$psc;
-    return c && c[0] === input.errorPositions ? c[1] : _computePatternScoreCold(input);
+    const id = (input.tokens as any)._id;
+    const c = _pscCache[id];
+    return c && c[0] === input.errorPositions ? c[1] : _computePatternScoreCold(input, id);
 }
 
-function _computePatternScoreCold(input: PatternScoreInput): number {
+function _computePatternScoreCold(input: PatternScoreInput, id: number): number {
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) return 100;
 
@@ -96,7 +98,7 @@ function _computePatternScoreCold(input: PatternScoreInput): number {
 
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     const result = Math.max(0, Math.min(100, score));
-    (tokens as any)._$psc = [errorPositions, result];
+    _pscCache[id] = [errorPositions, result];
     return result;
 }
 
@@ -113,13 +115,13 @@ type PatternScoreCalculatorInput = {
 export function createPatternScoreCalculator(
     input: PatternScoreCalculatorInput
 ): (errorPositions: number[]) => number {
-    const ta = input.tokens as any;
-    return ta._$calc || _createCalcCold(input, ta);
+    const id = (input.tokens as any)._id;
+    return _calcCache[id] || _createCalcCold(input, id);
 }
 
 function _createCalcCold(
     input: PatternScoreCalculatorInput,
-    ta: any,
+    id: number,
 ): (errorPositions: number[]) => number {
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) {
@@ -130,7 +132,7 @@ function _createCalcCold(
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;
-        ta._$calc = fn;
+        _calcCache[id] = fn;
         return fn;
     }
 
@@ -156,6 +158,6 @@ function _createCalcCold(
         return result;
     };
 
-    ta._$calc = fn;
+    _calcCache[id] = fn;
     return fn;
 }
