@@ -99,22 +99,19 @@ type PatternScoreInput = {
 const _pscKey = Symbol('psc-k');
 const _pscVal = Symbol('psc-v');
 
-export function computePatternScore({
-    errorPositions,
-    tokens,
-    contentLength,
-    language,
-}: PatternScoreInput): number {
-    if (tokens.length === 0 || contentLength === 0) return 100;
+export function computePatternScore(input: PatternScoreInput): number {
+    const tokens = input.tokens;
+    if (tokens.length === 0 || input.contentLength === 0) return 100;
 
-    // Single-entry cache: check if same errorPositions ref
     const ta = tokens as any;
-    if (ta[_pscKey] === errorPositions) return ta[_pscVal];
+    if (ta[_pscKey] === input.errorPositions) return ta[_pscVal];
 
-    const weights = getCachedWeights(language);
+    const weights = getCachedWeights(input.language);
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) return 100;
 
+    const errorPositions = input.errorPositions;
+    const contentLength = input.contentLength;
     let errorWeight = 0;
     for (let j = 0; j < errorPositions.length; j++) {
         const pos = errorPositions[j];
@@ -149,19 +146,18 @@ type PatternScoreCalculatorInput = {
  */
 const _calcSym = Symbol('calc');
 
-export function createPatternScoreCalculator({
-    tokens,
-    contentLength,
-    language,
-}: PatternScoreCalculatorInput): (errorPositions: number[]) => number {
-    if (tokens.length === 0 || contentLength === 0) {
+export function createPatternScoreCalculator(
+    input: PatternScoreCalculatorInput
+): (errorPositions: number[]) => number {
+    const tokens = input.tokens;
+    if (tokens.length === 0 || input.contentLength === 0) {
         return () => 100;
     }
 
     const ta = tokens as any;
     if (ta[_calcSym]) return ta[_calcSym];
 
-    const weights = getCachedWeights(language);
+    const weights = getCachedWeights(input.language);
 
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
@@ -170,7 +166,7 @@ export function createPatternScoreCalculator({
         return fn;
     }
 
-    // Single-entry last-result cache for inner function
+    const contentLength = input.contentLength;
     let lastKey: number[] | null = null;
     let lastVal = 0;
 
