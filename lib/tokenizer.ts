@@ -166,9 +166,7 @@ for (let c = 0; c < 128; c++) {
 const _tokenizeCache: Record<string, Token[]> = Object.create(null);
 
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
-    const cached = _tokenizeCache[content];
-    if (cached) return cached;
-    return _tokenizeImpl(content, language);
+    return _tokenizeCache[content] || _tokenizeImpl(content, language);
 }
 
 function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
@@ -286,9 +284,7 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
  * This enables O(1) lookups during scoring.
  */
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    const cached = (tokens as any)._$cm;
-    if (cached) return cached;
-    return _buildCategoryMapCold(tokens, length);
+    return (tokens as any)._$cm || _buildCategoryMapCold(tokens, length);
 }
 
 function _buildCategoryMapCold(tokens: Token[], length: number): TokenCategory[] {
