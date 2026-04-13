@@ -162,16 +162,16 @@ for (let c = 0; c < 128; c++) {
  * The tokenizer is intentionally simple (regex + character scanning) rather than
  * a full parser. It's accurate enough for scoring weights and pattern analysis.
  */
-// Memoization cache: content string → (language → Token[])
-const _tokenizeCache = new Map<string, Map<string, Token[]>>();
+// Memoization cache: plain object for faster string-key lookup
+const _tokenizeCache: Record<string, Token[]> = Object.create(null);
 
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
-    let langMap = _tokenizeCache.get(content);
-    if (langMap) {
-        const cached = langMap.get(language);
-        if (cached) return cached;
-    }
+    const cached = _tokenizeCache[content];
+    if (cached) return cached;
+    return _tokenizeImpl(content, language);
+}
 
+function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
     const len = content.length;
@@ -277,13 +277,7 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
         }
     }
 
-    // Cache the result
-    if (!langMap) {
-        langMap = new Map();
-        _tokenizeCache.set(content, langMap);
-    }
-    langMap.set(language, tokens);
-
+    _tokenizeCache[content] = tokens;
     return tokens;
 }
 
