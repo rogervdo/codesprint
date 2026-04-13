@@ -152,25 +152,14 @@ export function createPatternScoreCalculator({
         return () => 100;
     }
 
-    // Build a Float64Array weight map for fast O(1) lookups in the closure
-    const weightMap = new Float64Array(contentLength);
-    weightMap.fill(weights.whitespace);
-    for (let t = 0; t < tokens.length; t++) {
-        const tok = tokens[t];
-        const w = weights[tok.category];
-        const end = Math.min(tok.end, contentLength);
-        for (let i = tok.start; i < end; i++) {
-            weightMap[i] = w;
-        }
-    }
-
+    // Use binary search in closure — avoids Float64Array allocation
     return (errorPositions: number[]): number => {
         if (errorPositions.length === 0) return 100;
         let errorWeight = 0;
         for (let j = 0; j < errorPositions.length; j++) {
             const pos = errorPositions[j];
             if (pos >= 0 && pos < contentLength) {
-                errorWeight += weightMap[pos];
+                errorWeight += weightAtPosition(tokens, pos, weights);
             }
         }
         const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
