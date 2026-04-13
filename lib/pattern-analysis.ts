@@ -62,9 +62,6 @@ const CAT_INDEX: Record<TokenCategory, number> = {
 const errCts = new Int32Array(NUM_CATEGORIES);
 const totCts = new Int32Array(NUM_CATEGORIES);
 
-// Single tuple cache [errors, result] — 1 Symbol read per cache hit
-const _wp = Symbol('wp');
-
 // ---------------------------------------------------------------------------
 // Analysis
 // ---------------------------------------------------------------------------
@@ -76,8 +73,8 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    const c = (tokens as any)[_wp];
-    if (c && c[0] === errors) return c[1];
+    const c = (tokens as any)._$wp;
+    if (c !== undefined && c[0] === errors) return c[1];
     return _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
 }
 
@@ -141,7 +138,7 @@ function _analyzeWeakPatternsCold(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    (tokens as any)[_wp] = [errors, result];
+    (tokens as any)._$wp = [errors, result];
 
     return result;
 }

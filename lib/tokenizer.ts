@@ -285,10 +285,8 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
  * Build a lookup array mapping each character index to its token category.
  * This enables O(1) lookups during scoring.
  */
-const _cmSym = Symbol('cm');
-
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    const cached = (tokens as any)[_cmSym];
+    const cached = (tokens as any)._$cm;
     if (cached) return cached;
     return _buildCategoryMapCold(tokens, length);
 }
@@ -303,6 +301,6 @@ function _buildCategoryMapCold(tokens: Token[], length: number): TokenCategory[]
             map[i] = cat;
         }
     }
-    (tokens as any)[_cmSym] = map;
+    (tokens as any)._$cm = map;
     return map;
 }

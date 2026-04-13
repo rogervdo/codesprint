@@ -15,11 +15,11 @@ export type Metrics = {
 const MS_IN_MINUTE = 1000 * 60;
 
 type ComputeMetricsInput = {
-    correctProgress: number; // Characters in perfect words
+    correctProgress: number;
     elapsedMs: number;
-    totalTyped: number; // Total characters currently in the buffer (cursor position) - kept for legacy/other uses
-    totalKeystrokes?: number; // Total keys pressed (including backspaces)
-    correctKeystrokes?: number; // Total correct keys pressed
+    totalTyped: number;
+    totalKeystrokes?: number;
+    correctKeystrokes?: number;
 };
 
 export function computeMetrics({ correctProgress, elapsedMs, totalTyped, totalKeystrokes, correctKeystrokes }: ComputeMetricsInput): Metrics {
@@ -27,34 +27,21 @@ export function computeMetrics({ correctProgress, elapsedMs, totalTyped, totalKe
         return { rawWpm: 0, adjustedWpm: 0, accuracy: 1 };
     }
     const minutes = elapsedMs / MS_IN_MINUTE;
-
-    // Raw WPM: (Total Keystrokes / 5) / Time
-    // We use totalKeystrokes if available, otherwise fallback to totalTyped (backward compatibility/safety)
     const rawCount = totalKeystrokes ?? totalTyped;
     const rawWpm = (rawCount / 5) / minutes;
-
-    // Adjusted WPM: (Characters in Perfect Words / 5) / Time
-    // correctProgress now represents "sum of lengths of perfect words"
     const adjustedWpm = Math.max(0, (correctProgress / 5) / minutes);
-
-    // Accuracy: Correct Keystrokes / Total Keystrokes
     const accuracy =
         !totalKeystrokes || totalKeystrokes <= 0
             ? 1
             : Math.min(1, (correctKeystrokes ?? 0) / totalKeystrokes);
 
-    return {
-        rawWpm,
-        adjustedWpm,
-        accuracy,
-    };
+    return { rawWpm, adjustedWpm, accuracy };
 }
 
 // ---------------------------------------------------------------------------
 // Pattern Score
 // ---------------------------------------------------------------------------
 
-/** Compute totalWeight from tokens directly — O(numTokens) instead of O(numChars). */
 function totalWeightFromTokens(tokens: Token[], weights: TokenWeights): number {
     let total = 0;
     for (let t = 0; t < tokens.length; t++) {
@@ -64,7 +51,6 @@ function totalWeightFromTokens(tokens: Token[], weights: TokenWeights): number {
     return total;
 }
 
-/** Binary search tokens for the weight at a given position. */
 function weightAtPosition(tokens: Token[], pos: number, weights: TokenWeights): number {
     let lo = 0, hi = tokens.length - 1;
     while (lo <= hi) {
@@ -78,22 +64,16 @@ function weightAtPosition(tokens: Token[], pos: number, weights: TokenWeights): 
 }
 
 type PatternScoreInput = {
-    /** Error positions in the content string */
     errorPositions: number[];
-    /** Tokens from the tokenizer */
     tokens: Token[];
-    /** Total content length */
     contentLength: number;
-    /** Language for weight lookup */
     language: SupportedLanguage;
 };
 
-// Single tuple cache [key, value] — 1 Symbol read per cache hit instead of 2
-const _psc = Symbol('psc');
-
+// Named property cache — faster than Symbol in JSC (hidden class optimized)
 export function computePatternScore(input: PatternScoreInput): number {
-    const c = (input.tokens as any)[_psc];
-    if (c && c[0] === input.errorPositions) return c[1];
+    const c = (input.tokens as any)._$psc;
+    if (c !== undefined && c[0] === input.errorPositions) return c[1];
     return _computePatternScoreCold(input);
 }
 
@@ -117,12 +97,12 @@ function _computePatternScoreCold(input: PatternScoreInput): number {
 
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     const result = Math.max(0, Math.min(100, score));
-    (tokens as any)[_psc] = [errorPositions, result];
+    (tokens as any)._$psc = [errorPositions, result];
     return result;
 }
 
 // ---------------------------------------------------------------------------
-// createPatternScoreCalculator - cached version of computePatternScore
+// createPatternScoreCalculator
 // ---------------------------------------------------------------------------
 
 type PatternScoreCalculatorInput = {
@@ -131,16 +111,11 @@ type PatternScoreCalculatorInput = {
     language: SupportedLanguage;
 };
 
-const _calcSym = Symbol('calc');
-
-/**
- * Creates a reusable pattern score calculator — tiny hot path for JIT inlining.
- */
 export function createPatternScoreCalculator(
     input: PatternScoreCalculatorInput
 ): (errorPositions: number[]) => number {
     const ta = input.tokens as any;
-    if (ta[_calcSym]) return ta[_calcSym];
+    if (ta._$calc) return ta._$calc;
     return _createCalcCold(input, ta);
 }
 
@@ -157,7 +132,7 @@ function _createCalcCold(
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;
-        ta[_calcSym] = fn;
+        ta._$calc = fn;
         return fn;
     }
 
@@ -183,6 +158,6 @@ function _createCalcCold(
         return result;
     };
 
-    ta[_calcSym] = fn;
+    ta._$calc = fn;
     return fn;
 }
