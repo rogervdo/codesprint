@@ -73,7 +73,7 @@ type PatternScoreInput = {
 // Named property cache — faster than Symbol in JSC (hidden class optimized)
 export function computePatternScore(input: PatternScoreInput): number {
     const c = (input.tokens as any)._$psc;
-    if (c !== undefined && c[0] === input.errorPositions) return c[1];
+    if (c && c[0] === input.errorPositions) return c[1];
     return _computePatternScoreCold(input);
 }
 

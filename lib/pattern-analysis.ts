@@ -74,7 +74,7 @@ export function analyzeWeakPatterns(
     topN: number = 3,
 ): WeakPattern[] {
     const c = (tokens as any)._$wp;
-    if (c !== undefined && c[0] === errors) return c[1];
+    if (c && c[0] === errors) return c[1];
     return _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
 }
 
