@@ -71,8 +71,7 @@ const totCts = new Int32Array(NUM_CATEGORIES);
  *
  * Returns the top N weakest categories sorted by weighted error rate.
  */
-// Memoize: tokens → (errors → WeakPattern[])
-const _weakPatternCache = new WeakMap<Token[], Map<ErrorEntry[], WeakPattern[]>>();
+const _wpSym = Symbol('wp');
 
 export function analyzeWeakPatterns(
     errors: ErrorEntry[],
@@ -83,9 +82,9 @@ export function analyzeWeakPatterns(
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
-    let errMap = _weakPatternCache.get(tokens);
-    if (errMap) {
-        const cached = errMap.get(errors);
+    const cache = (tokens as any)[_wpSym] as Map<ErrorEntry[], WeakPattern[]> | undefined;
+    if (cache) {
+        const cached = cache.get(errors);
         if (cached) return cached;
     }
 
@@ -140,11 +139,13 @@ export function analyzeWeakPatterns(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    if (!errMap) {
-        errMap = new Map();
-        _weakPatternCache.set(tokens, errMap);
+    if (cache) {
+        cache.set(errors, result);
+    } else {
+        const m = new Map<ErrorEntry[], WeakPattern[]>();
+        m.set(errors, result);
+        (tokens as any)[_wpSym] = m;
     }
-    errMap.set(errors, result);
 
     return result;
 }

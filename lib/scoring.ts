@@ -95,8 +95,8 @@ type PatternScoreInput = {
  * Higher score = fewer errors on high-weight tokens.
  * A perfect run = 100.
  */
-// Memoize computePatternScore: tokens → (errorPositions → score)
-const _patternScoreCache = new WeakMap<Token[], Map<number[], number>>();
+// Symbol-based caching (faster than WeakMap — avoids hash lookup)
+const _pscSym = Symbol('psc');
 
 export function computePatternScore({
     errorPositions,
@@ -106,14 +106,13 @@ export function computePatternScore({
 }: PatternScoreInput): number {
     if (tokens.length === 0 || contentLength === 0) return 100;
 
-    let errMap = _patternScoreCache.get(tokens);
-    if (errMap) {
-        const cached = errMap.get(errorPositions);
+    const cache = (tokens as any)[_pscSym] as Map<number[], number> | undefined;
+    if (cache) {
+        const cached = cache.get(errorPositions);
         if (cached !== undefined) return cached;
     }
 
     const weights = getCachedWeights(language);
-
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) return 100;
 
@@ -128,11 +127,13 @@ export function computePatternScore({
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
     const result = Math.max(0, Math.min(100, score));
 
-    if (!errMap) {
-        errMap = new Map();
-        _patternScoreCache.set(tokens, errMap);
+    if (cache) {
+        cache.set(errorPositions, result);
+    } else {
+        const m = new Map<number[], number>();
+        m.set(errorPositions, result);
+        (tokens as any)[_pscSym] = m;
     }
-    errMap.set(errorPositions, result);
 
     return result;
 }
@@ -152,8 +153,7 @@ type PatternScoreCalculatorInput = {
  * totalWeight for a given snippet. Call this once per snippet and reuse the
  * returned function on every keystroke interval to avoid rebuilding the map.
  */
-// Memoize calculator creation + inner results
-const _calcCache = new WeakMap<Token[], (errorPositions: number[]) => number>();
+const _calcSym = Symbol('calc');
 
 export function createPatternScoreCalculator({
     tokens,
@@ -164,7 +164,7 @@ export function createPatternScoreCalculator({
         return () => 100;
     }
 
-    const cachedCalc = _calcCache.get(tokens);
+    const cachedCalc = (tokens as any)[_calcSym] as ((e: number[]) => number) | undefined;
     if (cachedCalc) return cachedCalc;
 
     const weights = getCachedWeights(language);
@@ -172,7 +172,7 @@ export function createPatternScoreCalculator({
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
         const fn = () => 100;
-        _calcCache.set(tokens, fn);
+        (tokens as any)[_calcSym] = fn;
         return fn;
     }
 
@@ -196,6 +196,6 @@ export function createPatternScoreCalculator({
         return result;
     };
 
-    _calcCache.set(tokens, fn);
+    (tokens as any)[_calcSym] = fn;
     return fn;
 }
