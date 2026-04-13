@@ -58,6 +58,10 @@ const CAT_INDEX: Record<TokenCategory, number> = {
     literal: 4, string: 5, comment: 6, whitespace: 7,
 };
 
+// Module-level reusable arrays (JS is single-threaded, safe to reuse)
+const errCts = new Int32Array(NUM_CATEGORIES);
+const totCts = new Int32Array(NUM_CATEGORIES);
+
 // ---------------------------------------------------------------------------
 // Analysis
 // ---------------------------------------------------------------------------
@@ -78,9 +82,9 @@ export function analyzeWeakPatterns(
 
     const weights = getCachedWeights(language);
 
-    // Fixed-size arrays instead of Maps — avoids per-call Map allocation
-    const errorCounts = new Int32Array(NUM_CATEGORIES);
-    const totalCounts = new Int32Array(NUM_CATEGORIES);
+    // Reset reusable arrays
+    errCts.fill(0);
+    totCts.fill(0);
 
     // Count errors per category using binary search
     for (let e = 0; e < errors.length; e++) {
@@ -95,26 +99,26 @@ export function analyzeWeakPatterns(
                 else if (idx >= tok.end) lo = mid + 1;
                 else { catIdx = CAT_INDEX[tok.category]; break; }
             }
-            errorCounts[catIdx]++;
+            errCts[catIdx]++;
         }
     }
 
     // Count total characters per category
     for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
-        totalCounts[CAT_INDEX[tok.category]] += tok.end - tok.start;
+        totCts[CAT_INDEX[tok.category]] += tok.end - tok.start;
     }
 
     // Build weak patterns with weighted error rate
     const patterns: WeakPattern[] = [];
     for (let c = 0; c < NUM_CATEGORIES; c++) {
-        if (errorCounts[c] > 0) {
+        if (errCts[c] > 0) {
             const category = ALL_CATEGORIES[c];
-            const totalTokens = totalCounts[c] || 1;
-            const errorRate = (errorCounts[c] / totalTokens) * weights[category];
+            const totalTokens = totCts[c] || 1;
+            const errorRate = (errCts[c] / totalTokens) * weights[category];
             patterns.push({
                 category,
-                errorCount: errorCounts[c],
+                errorCount: errCts[c],
                 totalTokens,
                 errorRate,
                 label: CATEGORY_LABELS[category],
