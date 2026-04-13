@@ -173,8 +173,8 @@ export function createPatternScoreCalculator(
     let lastVal = 0;
 
     const fn = (errorPositions: number[]): number => {
-        if (errorPositions.length === 0) return 100;
         if (lastKey === errorPositions) return lastVal;
+        if (errorPositions.length === 0) return 100;
 
         let errorWeight = 0;
         for (let j = 0; j < errorPositions.length; j++) {
