@@ -100,11 +100,12 @@ const _pscKey = Symbol('psc-k');
 const _pscVal = Symbol('psc-v');
 
 export function computePatternScore(input: PatternScoreInput): number {
+    // Cache check first — hot path avoids all other checks
+    const ta = input.tokens as any;
+    if (ta[_pscKey] === input.errorPositions) return ta[_pscVal];
+
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) return 100;
-
-    const ta = tokens as any;
-    if (ta[_pscKey] === input.errorPositions) return ta[_pscVal];
 
     const weights = getCachedWeights(input.language);
     const totalWeight = totalWeightFromTokens(tokens, weights);
@@ -149,13 +150,14 @@ const _calcSym = Symbol('calc');
 export function createPatternScoreCalculator(
     input: PatternScoreCalculatorInput
 ): (errorPositions: number[]) => number {
+    // Cache check first — hot path
+    const ta = input.tokens as any;
+    if (ta[_calcSym]) return ta[_calcSym];
+
     const tokens = input.tokens;
     if (tokens.length === 0 || input.contentLength === 0) {
         return () => 100;
     }
-
-    const ta = tokens as any;
-    if (ta[_calcSym]) return ta[_calcSym];
 
     const weights = getCachedWeights(input.language);
 

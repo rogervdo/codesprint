@@ -82,11 +82,11 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    if (errors.length === 0 || tokens.length === 0) return [];
-
-    // Single-entry cache: check if same errors ref
+    // Cache check first — hot path avoids all other checks
     const ta = tokens as any;
     if (ta[_wpKey] === errors) return ta[_wpVal];
+
+    if (errors.length === 0 || tokens.length === 0) return [];
 
     const weights = getCachedWeights(language);
 
