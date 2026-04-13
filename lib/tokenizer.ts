@@ -162,7 +162,16 @@ for (let c = 0; c < 128; c++) {
  * The tokenizer is intentionally simple (regex + character scanning) rather than
  * a full parser. It's accurate enough for scoring weights and pattern analysis.
  */
+// Memoization cache: content string → (language → Token[])
+const _tokenizeCache = new Map<string, Map<string, Token[]>>();
+
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
+    let langMap = _tokenizeCache.get(content);
+    if (langMap) {
+        const cached = langMap.get(language);
+        if (cached) return cached;
+    }
+
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
     const len = content.length;
@@ -268,6 +277,13 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
         }
     }
 
+    // Cache the result
+    if (!langMap) {
+        langMap = new Map();
+        _tokenizeCache.set(content, langMap);
+    }
+    langMap.set(language, tokens);
+
     return tokens;
 }
 
@@ -275,8 +291,12 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
  * Build a lookup array mapping each character index to its token category.
  * This enables O(1) lookups during scoring.
  */
+const _catMapCache = new WeakMap<Token[], TokenCategory[]>();
+
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    // Tokens are contiguous and cover all positions, so skip .fill()
+    const cached = _catMapCache.get(tokens);
+    if (cached && cached.length === length) return cached;
+
     const map: TokenCategory[] = new Array(length);
     for (let t = 0; t < tokens.length; t++) {
         const tok = tokens[t];
@@ -286,5 +306,6 @@ export function buildCategoryMap(tokens: Token[], length: number): TokenCategory
             map[i] = cat;
         }
     }
+    _catMapCache.set(tokens, map);
     return map;
 }
