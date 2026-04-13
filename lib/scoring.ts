@@ -95,6 +95,9 @@ type PatternScoreInput = {
  * Higher score = fewer errors on high-weight tokens.
  * A perfect run = 100.
  */
+// Memoize computePatternScore: tokens → (errorPositions → score)
+const _patternScoreCache = new WeakMap<Token[], Map<number[], number>>();
+
 export function computePatternScore({
     errorPositions,
     tokens,
@@ -103,12 +106,17 @@ export function computePatternScore({
 }: PatternScoreInput): number {
     if (tokens.length === 0 || contentLength === 0) return 100;
 
+    let errMap = _patternScoreCache.get(tokens);
+    if (errMap) {
+        const cached = errMap.get(errorPositions);
+        if (cached !== undefined) return cached;
+    }
+
     const weights = getCachedWeights(language);
 
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) return 100;
 
-    // Weighted errors via binary search (no categoryMap allocation)
     let errorWeight = 0;
     for (let j = 0; j < errorPositions.length; j++) {
         const pos = errorPositions[j];
@@ -118,7 +126,15 @@ export function computePatternScore({
     }
 
     const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
-    return Math.max(0, Math.min(100, score));
+    const result = Math.max(0, Math.min(100, score));
+
+    if (!errMap) {
+        errMap = new Map();
+        _patternScoreCache.set(tokens, errMap);
+    }
+    errMap.set(errorPositions, result);
+
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +152,9 @@ type PatternScoreCalculatorInput = {
  * totalWeight for a given snippet. Call this once per snippet and reuse the
  * returned function on every keystroke interval to avoid rebuilding the map.
  */
+// Memoize calculator creation + inner results
+const _calcCache = new WeakMap<Token[], (errorPositions: number[]) => number>();
+
 export function createPatternScoreCalculator({
     tokens,
     contentLength,
@@ -145,16 +164,25 @@ export function createPatternScoreCalculator({
         return () => 100;
     }
 
+    const cachedCalc = _calcCache.get(tokens);
+    if (cachedCalc) return cachedCalc;
+
     const weights = getCachedWeights(language);
 
     const totalWeight = totalWeightFromTokens(tokens, weights);
     if (totalWeight === 0) {
-        return () => 100;
+        const fn = () => 100;
+        _calcCache.set(tokens, fn);
+        return fn;
     }
 
-    // Use binary search in closure — avoids Float64Array allocation
-    return (errorPositions: number[]): number => {
+    const innerCache = new Map<number[], number>();
+
+    const fn = (errorPositions: number[]): number => {
         if (errorPositions.length === 0) return 100;
+        const cached = innerCache.get(errorPositions);
+        if (cached !== undefined) return cached;
+
         let errorWeight = 0;
         for (let j = 0; j < errorPositions.length; j++) {
             const pos = errorPositions[j];
@@ -163,6 +191,11 @@ export function createPatternScoreCalculator({
             }
         }
         const score = Math.round(((totalWeight - errorWeight) / totalWeight) * 100);
-        return Math.max(0, Math.min(100, score));
+        const result = Math.max(0, Math.min(100, score));
+        innerCache.set(errorPositions, result);
+        return result;
     };
+
+    _calcCache.set(tokens, fn);
+    return fn;
 }
