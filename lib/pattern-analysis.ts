@@ -62,17 +62,13 @@ const CAT_INDEX: Record<TokenCategory, number> = {
 const errCts = new Int32Array(NUM_CATEGORIES);
 const totCts = new Int32Array(NUM_CATEGORIES);
 
-// Single-entry cache via Symbols
-const _wpKey = Symbol('wp-k');
-const _wpVal = Symbol('wp-v');
+// Single tuple cache [errors, result] — 1 Symbol read per cache hit
+const _wp = Symbol('wp');
 
 // ---------------------------------------------------------------------------
 // Analysis
 // ---------------------------------------------------------------------------
 
-/**
- * Analyze error patterns — tiny hot path for JIT inlining.
- */
 export function analyzeWeakPatterns(
     errors: ErrorEntry[],
     tokens: Token[],
@@ -80,9 +76,9 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    const ta = tokens as any;
-    if (ta[_wpKey] === errors) return ta[_wpVal];
-    return _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN, ta);
+    const c = (tokens as any)[_wp];
+    if (c !== undefined && c[0] === errors) return c[1];
+    return _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
 }
 
 function _analyzeWeakPatternsCold(
@@ -91,7 +87,6 @@ function _analyzeWeakPatternsCold(
     contentLength: number,
     language: SupportedLanguage,
     topN: number,
-    ta: any,
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
@@ -146,8 +141,7 @@ function _analyzeWeakPatternsCold(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    ta[_wpKey] = errors;
-    ta[_wpVal] = result;
+    (tokens as any)[_wp] = [errors, result];
 
     return result;
 }
