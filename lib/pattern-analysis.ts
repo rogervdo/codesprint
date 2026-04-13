@@ -7,7 +7,6 @@
  */
 
 import type { Token, TokenCategory } from "./tokenizer";
-import { buildCategoryMap } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
 
@@ -63,14 +62,22 @@ export function analyzeWeakPatterns(
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
-    const categoryMap = buildCategoryMap(tokens, contentLength);
     const weights = getCachedWeights(language);
 
-    // Count errors per category
+    // Count errors per category using binary search (no categoryMap allocation)
     const errorsByCategory = new Map<TokenCategory, number>();
     for (const error of errors) {
         if (error.index >= 0 && error.index < contentLength) {
-            const category = categoryMap[error.index];
+            // Binary search for the token containing this error index
+            let lo = 0, hi = tokens.length - 1;
+            let category: TokenCategory = "whitespace";
+            while (lo <= hi) {
+                const mid = (lo + hi) >>> 1;
+                const tok = tokens[mid];
+                if (error.index < tok.start) hi = mid - 1;
+                else if (error.index >= tok.end) lo = mid + 1;
+                else { category = tok.category; break; }
+            }
             errorsByCategory.set(category, (errorsByCategory.get(category) ?? 0) + 1);
         }
     }

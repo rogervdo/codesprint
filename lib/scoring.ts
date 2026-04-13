@@ -1,7 +1,6 @@
 "use client";
 
 import type { Token } from "./tokenizer";
-import { buildCategoryMap } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
 import type { TokenWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
