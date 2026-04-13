@@ -99,6 +99,50 @@ const OPERATOR_CHARS = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Fast character classification via charCode
+// ---------------------------------------------------------------------------
+
+function isWhitespace(c: number): boolean {
+    return c === 32 /* ' ' */ || c === 9 /* '\t' */ || c === 10 /* '\n' */ || c === 13 /* '\r' */;
+}
+
+function isDigit(c: number): boolean {
+    return c >= 48 && c <= 57; // 0-9
+}
+
+function isIdentStart(c: number): boolean {
+    return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36; // A-Z, a-z, _, $
+}
+
+function isIdentChar(c: number): boolean {
+    return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c === 95 || c === 36;
+}
+
+function isNumericChar(c: number): boolean {
+    return (c >= 48 && c <= 57) // 0-9
+        || (c >= 65 && c <= 70) // A-F
+        || (c >= 97 && c <= 102) // a-f
+        || c === 120 || c === 88 // x, X
+        || c === 111 || c === 79 // o, O
+        || c === 98 || c === 66 // b, B
+        || c === 46 // .
+        || c === 95 // _
+        || c === 101 || c === 69 // e, E
+        || c === 43 || c === 45; // +, -
+}
+
+// Precompute delimiter and operator lookup tables (by charCode)
+const IS_DELIMITER = new Uint8Array(128);
+for (const ch of ["(", ")", "[", "]", "{", "}", ",", ";", ":", "."]) {
+    IS_DELIMITER[ch.charCodeAt(0)] = 1;
+}
+
+const IS_OPERATOR = new Uint8Array(128);
+for (const ch of ["+", "-", "*", "/", "%", "=", "<", ">", "!", "&", "|", "^", "~", "?", "@"]) {
+    IS_OPERATOR[ch.charCodeAt(0)] = 1;
+}
+
+// ---------------------------------------------------------------------------
 // Tokenizer
 // ---------------------------------------------------------------------------
 
@@ -111,86 +155,88 @@ const OPERATOR_CHARS = new Set([
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
+    const len = content.length;
     let i = 0;
 
-    while (i < content.length) {
-        const ch = content[i];
+    while (i < len) {
+        const cc = content.charCodeAt(i);
 
         // Whitespace run
-        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+        if (isWhitespace(cc)) {
             const start = i;
-            while (i < content.length && (content[i] === " " || content[i] === "\t" || content[i] === "\n" || content[i] === "\r")) {
-                i++;
-            }
+            i++;
+            while (i < len && isWhitespace(content.charCodeAt(i))) i++;
             tokens.push({ category: "whitespace", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // String literals
-        if (ch === '"' || ch === "'" || ch === "`") {
+        if (cc === 34 /* " */ || cc === 39 /* ' */ || cc === 96 /* ` */) {
             const start = i;
-            const quote = ch;
+            const quote = cc;
 
             // Check for triple quotes (Python)
-            if (language === "python" && i + 2 < content.length && content[i + 1] === quote && content[i + 2] === quote) {
+            if (language === "python" && i + 2 < len && content.charCodeAt(i + 1) === quote && content.charCodeAt(i + 2) === quote) {
                 i += 3;
-                while (i + 2 < content.length && !(content[i] === quote && content[i + 1] === quote && content[i + 2] === quote)) {
+                while (i + 2 < len && !(content.charCodeAt(i) === quote && content.charCodeAt(i + 1) === quote && content.charCodeAt(i + 2) === quote)) {
                     i++;
                 }
-                i = Math.min(i + 3, content.length);
+                i = Math.min(i + 3, len);
                 tokens.push({ category: "string", start, end: i, text: content.slice(start, i) });
                 continue;
             }
 
             // Template literal (JS backtick) or regular string
             i++;
-            while (i < content.length && content[i] !== quote) {
-                if (content[i] === "\\") i++; // skip escaped char
+            while (i < len && content.charCodeAt(i) !== quote) {
+                if (content.charCodeAt(i) === 92 /* \ */) i++; // skip escaped char
                 i++;
             }
-            if (i < content.length) i++; // closing quote
+            if (i < len) i++; // closing quote
             tokens.push({ category: "string", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Line comments
-        if (ch === "/" && i + 1 < content.length && content[i + 1] === "/") {
+        if (cc === 47 /* / */ && i + 1 < len && content.charCodeAt(i + 1) === 47) {
             const start = i;
-            while (i < content.length && content[i] !== "\n") i++;
+            while (i < len && content.charCodeAt(i) !== 10) i++;
             tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Block comments
-        if (ch === "/" && i + 1 < content.length && content[i + 1] === "*") {
+        if (cc === 47 /* / */ && i + 1 < len && content.charCodeAt(i + 1) === 42 /* * */) {
             const start = i;
             i += 2;
-            while (i + 1 < content.length && !(content[i] === "*" && content[i + 1] === "/")) i++;
-            i = Math.min(i + 2, content.length);
+            while (i + 1 < len && !(content.charCodeAt(i) === 42 && content.charCodeAt(i + 1) === 47)) i++;
+            i = Math.min(i + 2, len);
             tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Python hash comments
-        if (language === "python" && ch === "#") {
+        if (language === "python" && cc === 35 /* # */) {
             const start = i;
-            while (i < content.length && content[i] !== "\n") i++;
+            while (i < len && content.charCodeAt(i) !== 10) i++;
             tokens.push({ category: "comment", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Numeric literals
-        if (ch >= "0" && ch <= "9") {
+        if (isDigit(cc)) {
             const start = i;
-            while (i < content.length && /[0-9a-fA-FxXoObB._eE+\-]/.test(content[i])) i++;
+            i++;
+            while (i < len && isNumericChar(content.charCodeAt(i))) i++;
             tokens.push({ category: "literal", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Identifiers and keywords
-        if (/[a-zA-Z_$]/.test(ch)) {
+        if (isIdentStart(cc)) {
             const start = i;
-            while (i < content.length && /[a-zA-Z0-9_$]/.test(content[i])) i++;
+            i++;
+            while (i < len && isIdentChar(content.charCodeAt(i))) i++;
             const text = content.slice(start, i);
             const category: TokenCategory = keywords.has(text) ? "keyword" : "identifier";
             tokens.push({ category, start, end: i, text });
@@ -198,22 +244,27 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
         }
 
         // Delimiters
-        if (DELIMITERS.has(ch)) {
-            tokens.push({ category: "delimiter", start: i, end: i + 1, text: ch });
+        if (cc < 128 && IS_DELIMITER[cc]) {
+            tokens.push({ category: "delimiter", start: i, end: i + 1, text: content[i] });
             i++;
             continue;
         }
 
         // Operators (may be multi-char: ==, !=, >=, <=, =>. ++, --, etc.)
-        if (OPERATOR_CHARS.has(ch)) {
+        if (cc < 128 && IS_OPERATOR[cc]) {
             const start = i;
-            while (i < content.length && OPERATOR_CHARS.has(content[i])) i++;
+            i++;
+            while (i < len) {
+                const oc = content.charCodeAt(i);
+                if (oc >= 128 || !IS_OPERATOR[oc]) break;
+                i++;
+            }
             tokens.push({ category: "operator", start, end: i, text: content.slice(start, i) });
             continue;
         }
 
         // Fallback: treat as identifier (e.g. unicode chars, # in non-python)
-        tokens.push({ category: "identifier", start: i, end: i + 1, text: ch });
+        tokens.push({ category: "identifier", start: i, end: i + 1, text: content[i] });
         i++;
     }
 
