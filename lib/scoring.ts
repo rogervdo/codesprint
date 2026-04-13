@@ -134,7 +134,6 @@ function _createCalcCold(
         return fn;
     }
 
-    const contentLength = input.contentLength;
     let lastKey: number[] | null = null;
     let lastVal = 0;
 
