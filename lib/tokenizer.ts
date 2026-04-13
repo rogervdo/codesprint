@@ -276,10 +276,14 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
  * This enables O(1) lookups during scoring.
  */
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    const map: TokenCategory[] = new Array(length).fill("whitespace");
-    for (const token of tokens) {
-        for (let i = token.start; i < token.end && i < length; i++) {
-            map[i] = token.category;
+    // Tokens are contiguous and cover all positions, so skip .fill()
+    const map: TokenCategory[] = new Array(length);
+    for (let t = 0; t < tokens.length; t++) {
+        const tok = tokens[t];
+        const cat = tok.category;
+        const end = Math.min(tok.end, length);
+        for (let i = tok.start; i < end; i++) {
+            map[i] = cat;
         }
     }
     return map;
