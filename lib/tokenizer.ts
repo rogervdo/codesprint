@@ -172,6 +172,12 @@ export function tokenize(content: string, language: SupportedLanguage): Token[] 
 function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
+    // Pre-define cache slots for monomorphic hidden class across all token arrays
+    const ta = tokens as any;
+    ta._$psc = undefined;
+    ta._$calc = undefined;
+    ta._$cm = undefined;
+    ta._$wp = undefined;
     const len = content.length;
     let i = 0;
 
