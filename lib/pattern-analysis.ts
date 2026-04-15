@@ -74,9 +74,8 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    const id = (tokens as any)._id;
-    const c = _wpCache[id];
-    return c && c[0] === errors ? c[1] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN, id);
+    const c = _wpCache[(tokens as any)._id];
+    return c && c[0] === errors ? c[1] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
 }
 
 function _analyzeWeakPatternsCold(
@@ -85,7 +84,6 @@ function _analyzeWeakPatternsCold(
     contentLength: number,
     language: SupportedLanguage,
     topN: number,
-    id: number,
 ): WeakPattern[] {
     if (errors.length === 0 || tokens.length === 0) return [];
 
@@ -140,7 +138,7 @@ function _analyzeWeakPatternsCold(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    _wpCache[id] = [errors, result];
+    _wpCache[(tokens as any)._id] = [errors, result];
 
     return result;
 }
