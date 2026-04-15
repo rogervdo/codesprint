@@ -6,7 +6,7 @@
  * (e.g., "You struggle with operators and delimiters").
  */
 
-import type { Token, TokenCategory } from "./tokenizer";
+import type { Token, TokenCategory, CachedTokenArray } from "./tokenizer";
 import { _wpCache } from "./tokenizer";
 import { getCachedWeights } from "./token-weights";
 import type { SupportedLanguage } from "./snippets";
@@ -74,8 +74,8 @@ export function analyzeWeakPatterns(
     language: SupportedLanguage,
     topN: number = 3,
 ): WeakPattern[] {
-    const c = _wpCache[(tokens as any)._id];
-    return c && c[0] === errors ? c[1] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
+    const c = _wpCache[(tokens as CachedTokenArray)._id];
+    return c && c[0] === errors ? c[1] as WeakPattern[] : _analyzeWeakPatternsCold(errors, tokens, contentLength, language, topN);
 }
 
 function _analyzeWeakPatternsCold(
@@ -138,7 +138,7 @@ function _analyzeWeakPatternsCold(
         .sort((a, b) => b.errorRate - a.errorRate)
         .slice(0, topN);
 
-    _wpCache[(tokens as any)._id] = [errors, result];
+    _wpCache[(tokens as CachedTokenArray)._id] = [errors, result];
 
     return result;
 }

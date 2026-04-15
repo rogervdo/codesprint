@@ -32,6 +32,11 @@ export type Token = {
     text: string;
 };
 
+/** Token array augmented with a numeric cache ID */
+export interface CachedTokenArray extends Array<Token> {
+    _id: number;
+}
+
 // ---------------------------------------------------------------------------
 // Language keyword sets
 // ---------------------------------------------------------------------------
@@ -170,7 +175,7 @@ let _nextTokenId = 0;
 export const _cmCache: (TokenCategory[] | null)[] = [];
 export const _pscCache: ([number[], number] | null)[] = [];
 export const _calcCache: (((ep: number[]) => number) | null)[] = [];
-export const _wpCache: ([any[], any] | null)[] = [];
+export const _wpCache: ([unknown[], unknown[]] | null)[] = [];
 
 export function tokenize(content: string, language: SupportedLanguage): Token[] {
     return _tokenizeCache[content] || _tokenizeImpl(content, language);
@@ -180,7 +185,7 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
     const keywords = KEYWORD_SETS[language];
     const tokens: Token[] = [];
     // Assign numeric ID for fast global array-indexed caching
-    (tokens as any)._id = _nextTokenId++;
+    (tokens as CachedTokenArray)._id = _nextTokenId++;
     const len = content.length;
     let i = 0;
 
@@ -293,7 +298,7 @@ function _tokenizeImpl(content: string, language: SupportedLanguage): Token[] {
  * This enables O(1) lookups during scoring.
  */
 export function buildCategoryMap(tokens: Token[], length: number): TokenCategory[] {
-    const id = (tokens as any)._id;
+    const id = (tokens as CachedTokenArray)._id;
     return _cmCache[id] || _buildCategoryMapCold(tokens, length, id);
 }
 
