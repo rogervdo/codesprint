@@ -24,6 +24,23 @@ export type DifficultyTransition = {
 
 const DIFFICULTY_ORDER: readonly Difficulty[] = ["easy", "medium", "hard"];
 
+export function describeDifficultyTransition(
+  previousDifficulty: Difficulty,
+  newDifficulty: Difficulty
+): DifficultyTransition {
+  const previousIndex = DIFFICULTY_ORDER.indexOf(previousDifficulty);
+  const nextIndex = DIFFICULTY_ORDER.indexOf(newDifficulty);
+
+  if (previousIndex === nextIndex) {
+    return { newDifficulty, reason: "unchanged" };
+  }
+
+  return {
+    newDifficulty,
+    reason: nextIndex > previousIndex ? "promoted" : "demoted",
+  };
+}
+
 export function computeEMA(
   previous: number,
   latest: number,

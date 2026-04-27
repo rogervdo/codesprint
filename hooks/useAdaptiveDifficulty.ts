@@ -6,7 +6,7 @@ import type { SkillModelRecord, DifficultyTransition, SessionResult } from "@/li
 import {
     updateSkillModel as pureUpdateSkillModel,
     getDefaultSkillModel,
-    computeDifficultyTransition,
+    describeDifficultyTransition,
 } from "@/lib/adaptive";
 import { idbGet, idbPut, STORES } from "@/lib/storage/idb-store";
 import type { SkillModelRecord as IdbSkillModelRecord } from "@/lib/storage/idb-store";
@@ -73,7 +73,7 @@ export function useAdaptiveDifficulty(
 
             try {
                 const updated = pureUpdateSkillModel(skillModel, result);
-                const transition = computeDifficultyTransition(skillModel, result);
+                const transition = describeDifficultyTransition(skillModel.currentDifficulty, updated.currentDifficulty);
 
                 await idbPut(STORES.skillModels, {
                     ...updated,

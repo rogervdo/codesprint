@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 export type ResultGraphPoint = {
     time: number;
+    /** Smooth net graph WPM snapshot, not the final strict adjusted WPM. */
     wpm: number;
     raw: number;
     errors: number;
@@ -124,7 +125,7 @@ export default function ResultGraph({ data, width = "100%", height = 300 }: Resu
                     opacity="0.5"
                 />
 
-                {/* Net WPM Line */}
+                {/* Net graph WPM line */}
                 <path
                     d={wpmPath}
                     fill="none"
@@ -211,7 +212,7 @@ export default function ResultGraph({ data, width = "100%", height = 300 }: Resu
                         <Flex align="center" justify="space-between" gap={3}>
                             <Flex align="center" gap={2}>
                                 <Box w={2} h={2} bg="var(--accent)" borderRadius="sm" />
-                                <Text opacity={0.8}>wpm:</Text>
+                                <Text opacity={0.8}>net:</Text>
                             </Flex>
                             <Text fontWeight="bold">{processedData[hoverIndex].wpm}</Text>
                         </Flex>

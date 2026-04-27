@@ -7,7 +7,14 @@ import { usePreferences } from "@/lib/preferences";
 export type Phase = "idle" | "countdown" | "running" | "finished";
 
 export type ErrorEntry = { expected: string; got: string; index: number };
-export type HistoryEntry = { time: number; wpm: number; raw: number; errors: number; burst: number };
+export type HistoryEntry = {
+    time: number;
+    /** Smooth net graph WPM snapshot; final score uses metrics.adjustedWpm. */
+    wpm: number;
+    raw: number;
+    errors: number;
+    burst: number;
+};
 
 function normalizeWhitespace(ch: string) {
     return ch === "\r" ? "\n" : ch;
@@ -112,12 +119,8 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
 
             const minutes = elapsed / MS_PER_MINUTE;
             const rawWpm = Math.round((totalKeystrokes / WORD_LENGTH_CHARS) / minutes);
-            // Approximate net wpm for history (using simple correct chars count for smoothness in graph)
-            // For the live stat we use the strict "perfect word" logic, but for history graph 
-            // a smoother approximation (cursor - errors) is often preferred to avoid jagged drops.
-            // However, to be consistent, we should ideally use the same logic. 
-            // But calculating perfect words inside this interval without access to full state/snippet is hard.
-            // Let's stick to the previous approximation for the graph for now, or use correctKeystrokes.
+            // Smooth net graph WPM. Final result scoring uses the stricter
+            // adjustedWpm metric from computeMetrics.
             const netWpm = Math.max(0, Math.round(((cursorIndex - wrongCharsSize) / WORD_LENGTH_CHARS) / minutes));
 
             // Burst: Instantaneous Raw WPM over the last second

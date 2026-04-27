@@ -13,6 +13,8 @@ import type { Difficulty } from "@/lib/snippets";
 export interface ResultScreenProps {
     /** Adjusted WPM score */
     wpm: number;
+    /** Raw WPM based on total keystrokes */
+    rawWpm: number;
     /** Accuracy percentage */
     accuracy: number;
     /** Time taken in milliseconds */
@@ -63,6 +65,7 @@ export interface ResultScreenProps {
  */
 export function ResultScreen({
     wpm,
+    rawWpm,
     accuracy,
     timeMs,
     errors,
@@ -101,6 +104,7 @@ export function ResultScreen({
             <Stack gap={5} align="center" w="100%" maxW="1000px">
                 <ResultCard
                     wpm={wpm}
+                    rawWpm={rawWpm}
                     accuracy={accuracy}
                     timeMs={timeMs}
                     errors={errors}

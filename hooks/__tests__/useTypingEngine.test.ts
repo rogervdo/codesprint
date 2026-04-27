@@ -323,6 +323,31 @@ describe("useTypingEngine", () => {
         expect(onFinish).toHaveBeenCalledTimes(1);
     });
 
+    it("publishes distinct final raw WPM, adjusted WPM, and accuracy after an error and backspace", () => {
+        vi.setSystemTime(new Date("2026-01-01T00:00:01.000Z"));
+        const snippet = makeSnippet("ab cd");
+        const { result } = renderHook(() => useTypingEngine({ snippet }));
+
+        act(() => {
+            result.current.handleKeyDown(fireKey("x"));
+            result.current.handleKeyDown(fireKey("Backspace"));
+            result.current.handleKeyDown(fireKey("a"));
+            result.current.handleKeyDown(fireKey("b"));
+            result.current.handleKeyDown(fireKey(" "));
+            result.current.handleKeyDown(fireKey("c"));
+        });
+
+        vi.setSystemTime(new Date("2026-01-01T00:01:01.000Z"));
+        act(() => {
+            result.current.handleKeyDown(fireKey("d"));
+        });
+
+        expect(result.current.phase).toBe("finished");
+        expect(result.current.metrics.rawWpm).toBeCloseTo(1.4);
+        expect(result.current.metrics.adjustedWpm).toBeCloseTo(1);
+        expect(result.current.metrics.accuracy).toBeCloseTo(5 / 7);
+    });
+
     // -------------------------------------------------------------------------
     // Enter treated as newline
     // -------------------------------------------------------------------------

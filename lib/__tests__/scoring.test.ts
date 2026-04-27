@@ -38,6 +38,20 @@ describe("computeMetrics", () => {
         });
         expect(result.accuracy).toBe(0.9);
     });
+
+    it("keeps raw WPM, adjusted WPM, and accuracy separate when mistakes add keystrokes", () => {
+        const result = computeMetrics({
+            correctProgress: 20,
+            elapsedMs: 60000,
+            totalTyped: 25,
+            totalKeystrokes: 30,
+            correctKeystrokes: 24,
+        });
+
+        expect(result.rawWpm).toBe(6);
+        expect(result.adjustedWpm).toBe(4);
+        expect(result.accuracy).toBe(0.8);
+    });
 });
 
 describe("computePatternScore", () => {

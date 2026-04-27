@@ -28,7 +28,7 @@ import { usePreferences } from "@/lib/preferences";
 interface AIDrillPanelProps {
     isOpen: boolean;
     onClose: () => void;
-    onAccept: (snippet: Snippet) => void;
+    onAccept: (snippet: Snippet) => void | Promise<void>;
     language: SupportedLanguage;
 }
 
@@ -59,7 +59,7 @@ export function AIDrillPanel({ isOpen, onClose, onAccept, language }: AIDrillPan
     const handleAccept = useCallback(async () => {
         const snippet = await ai.acceptDrill();
         if (snippet) {
-            onAccept(snippet);
+            await onAccept(snippet);
             onClose();
         }
     }, [ai, onAccept, onClose]);

@@ -179,7 +179,24 @@ describe("useSessionLifecycle", () => {
             errorCount: defaultProps.errorCount,
             history: defaultProps.history,
             patternScore: undefined,
+            errors: undefined,
+            snippetContentLength: undefined,
+            snippetContent: undefined,
         });
+    });
+
+    it("records AI drill status when provided", () => {
+        const { rerender } = renderHook(
+            (props) => useSessionLifecycle(props),
+            { initialProps: { ...defaultProps, isAIDrill: true } }
+        );
+
+        rerender({ ...defaultProps, isAIDrill: true, phase: "finished" });
+
+        expect(mockCreateSessionAsync).toHaveBeenCalledWith(expect.objectContaining({
+            snippetId: defaultProps.snippetId,
+            isAIDrill: true,
+        }));
     });
 
     it("passes correct metrics to saveScore", () => {

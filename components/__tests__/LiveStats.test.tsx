@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { renderWithProviders as render } from "@/test-utils/render";
 import LiveStats from "../LiveStats";
 
 describe("LiveStats", () => {

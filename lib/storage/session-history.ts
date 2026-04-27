@@ -18,6 +18,7 @@ export type SessionRecord = {
     errorCount: number;
     history: HistoryEntry[];
     patternScore?: number;
+    isAIDrill?: boolean;
     // For AI drill weak pattern aggregation
     errors?: ErrorEntry[];
     snippetContentLength?: number;

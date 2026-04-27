@@ -24,6 +24,7 @@ export interface UseSessionLifecycleProps {
     history: HistoryEntry[];
     lengthCategory: SnippetLength;
     difficulty: Difficulty;
+    isAIDrill?: boolean;
     // NEW - for AI drill weak pattern aggregation
     errors?: ErrorEntry[];
     snippetContent?: string;
@@ -66,6 +67,7 @@ export function useSessionLifecycle({
     history,
     lengthCategory,
     difficulty,
+    isAIDrill,
     errors,
     snippetContent,
     onResetEngine,
@@ -123,6 +125,7 @@ export function useSessionLifecycle({
             language,
             lengthCategory,
             difficulty,
+            ...(isAIDrill !== undefined ? { isAIDrill } : {}),
             wpm: metrics.adjustedWpm,
             rawWpm: metrics.rawWpm,
             accuracy: metrics.accuracy,
@@ -150,7 +153,7 @@ export function useSessionLifecycle({
                 lengthCategory,
             });
         }
-    }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, difficulty, onSessionFinished, errors, snippetContent]);
+    }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, difficulty, isAIDrill, onSessionFinished, errors, snippetContent]);
 
     return {
         autoAdvanceDeadline,

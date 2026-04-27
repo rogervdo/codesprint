@@ -59,6 +59,55 @@ describe("useSessionControls", () => {
         expect(result.current.snippet.content.length).toBeGreaterThan(0);
     });
 
+    it("keeps an accepted AI drill active before the snippet catalog refreshes", () => {
+        const baseSnippet = makeSnippet({
+            id: "python:short",
+            problemId: "python:short",
+            lengthCategory: "short",
+        });
+        const aiDrill = makeSnippet({
+            id: "ai-drill-record-1",
+            problemId: "ai-drill-ai-drill-record-1",
+            title: "Generated Loop Drill",
+            content: "class Solution {\n    int run() { return 1; }\n}\n",
+            language: "java",
+            lengthCategory: "medium",
+            difficulty: "hard",
+            lines: 3,
+        });
+
+        const { result, rerender } = renderHook(
+            ({ snippets }) => {
+                const [language, setLanguage] = useState<SupportedLanguage>("python");
+                return useSessionControls({ snippets, onResetEngine: mockResetEngine, language, setLanguage });
+            },
+            { initialProps: { snippets: [baseSnippet] } }
+        );
+
+        mockResetEngine.mockClear();
+        act(() => {
+            result.current.setSnippet(aiDrill);
+        });
+
+        expect(mockResetEngine).toHaveBeenCalledTimes(1);
+        expect(result.current.language).toBe("java");
+        expect(result.current.lengthPreference).toBe("medium");
+        expect(result.current.problemId).toBe(aiDrill.problemId);
+        expect(result.current.snippetId).toBe(aiDrill.id);
+        expect(result.current.snippet).toMatchObject({
+            id: aiDrill.id,
+            problemId: aiDrill.problemId,
+            language: "java",
+            difficulty: "hard",
+            lengthCategory: "medium",
+        });
+
+        rerender({ snippets: [baseSnippet, aiDrill] });
+
+        expect(result.current.snippet.id).toBe(aiDrill.id);
+        expect(result.current.problemOptions.some((problem) => problem.id === aiDrill.problemId)).toBe(true);
+    });
+
     it("navigates to next problem", () => {
         const { result } = renderControls();
         const firstProblemId = result.current.problemId;

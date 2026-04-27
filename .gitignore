@@ -49,6 +49,7 @@ AGENTS.md
 .ralphy/
 hookgen/
 logs/
+.claude/
 
 # separate project / planning artifacts
 codesprint/

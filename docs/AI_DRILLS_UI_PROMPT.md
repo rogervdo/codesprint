@@ -1,8 +1,10 @@
 # CodeSprint AI Drills - UI Implementation Task
 
+> Status: Archived. The AI drills UI and session integration described here have been implemented. Keep this file as historical implementation context; do not treat the unchecked task list below as current project state. Current status lives in `docs/plans/AI-DRILLS-SPEC.md`.
+
 ## Context
 
-You are implementing the UI components for the AI Drills feature in CodeSprint. The infrastructure is complete and ready to use. You need to build the remaining UI components and integrate them into the existing session flow.
+This document was written before the AI drill UI shipped. The infrastructure, UI components, accepted-drill session flow, result badging, and export/import support are now implemented. Remaining work is live-provider manual verification, E2E coverage, and accessibility polish.
 
 ## What's Already Implemented
 

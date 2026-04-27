@@ -35,7 +35,7 @@ Most typing tests measure how fast you can type English. That doesn't translate 
 CodeSprint exists because syntax fluency matters — in interviews and in daily work. It lets you drill patterns like "Depth First Search in Python" or "Ring Buffer in C++" until your fingers know the shape of the code.
 
 > [!NOTE]
-> CodeSprint runs entirely client-side. No account, no backend, no data leaves your browser.
+> Core typing practice runs client-side with no account required. Session data stays in browser storage. If AI drills are enabled, your browser sends prompt context and your BYOK API key to this app's `/api/generate` route to proxy the provider request; keys are not stored server-side.
 
 ## Features
 
@@ -103,6 +103,15 @@ Tracks your proficiency per language and recommends what to practice next. Adjus
 
 </details>
 
+<details>
+<summary><strong>AI Drills</strong></summary>
+
+<br>
+
+Optional BYOK drill generation targets your recent weak syntax patterns. Accepted drills are saved as custom snippets, participate in normal session history, and show an AI badge on the result screen. Supported providers are Claude, OpenAI, and Fireworks.
+
+</details>
+
 ## How It Works
 
 ### The Editor
@@ -115,7 +124,11 @@ React's render cycle is too slow for a 100+ WPM feedback loop. The typing engine
 
 ### Storage
 
-Everything runs client-side. Session history, achievements, mastery records, and XP live in IndexedDB with localStorage as a fallback for preferences. Data export is available in CSV and JSON formats.
+Core session data stays client-side. Session history, achievements, mastery records, custom snippets, and XP live in IndexedDB with localStorage as a fallback for preferences. Data export is available in CSV and JSON formats. AI drill API keys are stored in localStorage and are sent only when you explicitly use AI drill generation.
+
+### AI Drills
+
+AI drills aggregate recent weak syntax patterns, build a focused generation request, and proxy it through `/api/generate` using your selected BYOK provider. Generated code is validated before preview. When accepted, the drill is converted into the same `Snippet` shape as LeetCode-derived snippets so it can be practiced, saved, exported, and analyzed like any other run.
 
 ## Data Pipeline
 
@@ -173,9 +186,11 @@ npm start
 
 ## Roadmap
 
+- **AI Drills** — BYOK generation, preview/accept flow, result badging, export support, and session recording. ✓ Shipped.
 - **Custom Renderer** — Migrating from Monaco to a WebGL/Canvas text renderer for zero DOM overhead (Gap Buffer implementation in progress).
 - **Tree-sitter Integration** — Semantic typing that lets you skip whitespace and formatting irrelevant to code logic.
 - **Advanced Analytics** — Cross-session syntax category trend view with top-movers panels and sparklines (accessible via `A` / header icon). ✓ Shipped.
+- **Mistake Replay** — Generate short local drills from exact failed spans before moving to the next problem.
 
 ## License
 

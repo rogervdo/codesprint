@@ -10,7 +10,10 @@
 // ---------------------------------------------------------------------------
 
 export type ShareCardData = {
+    /** Adjusted WPM score */
     wpm: number;
+    /** Raw WPM based on total keystrokes */
+    rawWpm: number;
     accuracy: number;
     patternScore?: number;
     snippetTitle: string;
@@ -171,7 +174,7 @@ export async function renderShareCard(data: ShareCardData): Promise<HTMLCanvasEl
     ctx.textAlign = "center";
     ctx.fillStyle = colors.text;
     ctx.font = `bold 32px ${FONT}`;
-    ctx.fillText(`${Math.round(data.wpm)}`, PADDING + statSpacing * 0.5, statsY);
+    ctx.fillText(`${Math.round(data.rawWpm)}`, PADDING + statSpacing * 0.5, statsY);
     ctx.fillStyle = colors.textSubtle;
     ctx.font = `12px ${FONT}`;
     ctx.fillText("RAW", PADDING + statSpacing * 0.5, statsY + 20);

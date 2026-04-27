@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Stack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -30,7 +30,8 @@ import { useSessionControls } from "@/hooks/useSessionControls";
 import { useAchievements } from "@/hooks/useAchievements";
 import { useSpacedRepetition } from "@/hooks/useSpacedRepetition";
 import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
-import type { SupportedLanguage, Difficulty, SnippetLength } from "@/lib/snippets";
+import type { SupportedLanguage, Difficulty, SnippetLength, Snippet } from "@/lib/snippets";
+import type { DifficultyTransition } from "@/lib/adaptive";
 
 const CodePanel = dynamic(() => import("@/components/CodePanel"), {
     ssr: false,
@@ -40,6 +41,7 @@ const CodePanel = dynamic(() => import("@/components/CodePanel"), {
 export default function TypingSession() {
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isDrillPanelOpen, setIsDrillPanelOpen] = useState(false);
+    const [difficultyTransition, setDifficultyTransition] = useState<DifficultyTransition | undefined>(undefined);
     const panelContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Store engine reset function in a ref to break circular dependency
@@ -68,7 +70,7 @@ export default function TypingSession() {
 
     // Session Controls (language, length, problem, snippet selection)
     const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>("python");
-    const { snippets } = useSnippets(selectedLanguage);
+    const { snippets, refreshAIDrills } = useSnippets(selectedLanguage);
 
     // Use a stable callback that references the ref
     const handleResetEngine = useCallback(() => {
@@ -147,12 +149,16 @@ export default function TypingSession() {
             accuracy: sessionData.accuracy,
             patternScore: sessionData.patternScore,
         });
-        adaptiveUpdateSkillModel({
+        if (!preferences.adaptiveDifficultyEnabled) {
+            setDifficultyTransition(undefined);
+            return;
+        }
+        void adaptiveUpdateSkillModel({
             wpm: sessionData.wpm,
             accuracy: sessionData.accuracy,
             difficulty: sessionData.difficulty,
-        });
-    }, [srUpdateMastery, adaptiveUpdateSkillModel]);
+        }).then(setDifficultyTransition);
+    }, [srUpdateMastery, adaptiveUpdateSkillModel, preferences.adaptiveDifficultyEnabled]);
 
     // Session Lifecycle (auto-advance, score saving)
     const lifecycle = useSessionLifecycle({
@@ -167,6 +173,7 @@ export default function TypingSession() {
         history: engine.history,
         lengthCategory: controls.snippet.lengthCategory,
         difficulty: controls.snippet.difficulty,
+        isAIDrill: controls.snippet.problemId.startsWith("ai-drill-"),
         // NEW - pass error data for AI drill weak pattern aggregation
         errors: engine.errorLog,
         snippetContent: controls.snippet.content,
@@ -231,10 +238,16 @@ export default function TypingSession() {
         controls.handleNextProblem();
     }, [focus, lifecycle, controls]);
 
-    const handleDrillAccept = useCallback((snippet: import("@/lib/snippets").Snippet) => {
-        // Load the AI drill as current snippet via controls
+    useEffect(() => {
+        if (engine.phase !== "finished") {
+            setDifficultyTransition(undefined);
+        }
+    }, [engine.phase]);
+
+    const handleDrillAccept = useCallback(async (snippet: Snippet) => {
+        await refreshAIDrills();
         controls.setSnippet(snippet);
-    }, [controls]);
+    }, [controls, refreshAIDrills]);
 
     return (
         <Box position="relative" minH="400px">
@@ -337,6 +350,7 @@ export default function TypingSession() {
                     /* Result Screen */
                     <ResultScreen
                         wpm={engine.metrics.adjustedWpm}
+                        rawWpm={engine.metrics.rawWpm}
                         accuracy={engine.metrics.accuracy}
                         timeMs={engine.elapsedMs}
                         errors={engine.wrongChars.size}
@@ -356,7 +370,7 @@ export default function TypingSession() {
                         contentLength={controls.snippet.content.length}
                         xpGained={achievements.xpGained}
                         newlyUnlocked={achievements.newlyUnlocked}
-                        difficultyTransition={adaptive.suggestedDifficulty !== controls.snippet.difficulty ? { newDifficulty: adaptive.suggestedDifficulty, reason: "promoted" as const } : undefined}
+                        difficultyTransition={preferences.adaptiveDifficultyEnabled ? difficultyTransition : undefined}
                         isAIDrill={controls.snippet.problemId.startsWith("ai-drill-")}
                     />
                 )}

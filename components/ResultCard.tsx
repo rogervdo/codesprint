@@ -16,6 +16,7 @@ type ErrorEntry = { expected: string; got: string; index: number };
 
 type ResultCardProps = {
     wpm: number;
+    rawWpm: number;
     accuracy: number;
     timeMs: number;
     errors: number;
@@ -51,6 +52,7 @@ function capitalize(value: string) {
 
 export default function ResultCard({
     wpm,
+    rawWpm,
     accuracy,
     timeMs,
     errors,
@@ -103,6 +105,7 @@ export default function ResultCard({
 
     const shareCardData: ShareCardData = useMemo(() => ({
         wpm,
+        rawWpm,
         accuracy,
         patternScore,
         snippetTitle: snippetTitle || snippetId,
@@ -110,7 +113,7 @@ export default function ResultCard({
         difficulty,
         timeMs,
         history: history.map((h) => ({ time: h.time, wpm: h.wpm })),
-    }), [wpm, accuracy, patternScore, snippetTitle, snippetId, language, difficulty, timeMs, history]);
+    }), [wpm, rawWpm, accuracy, patternScore, snippetTitle, snippetId, language, difficulty, timeMs, history]);
 
     const handleShare = useCallback(async () => {
         setIsSharing(true);
@@ -257,7 +260,7 @@ export default function ResultCard({
                         columnGap={{ base: 4, md: 8 }}
                         rowGap={4}
                     >
-                        <StatBox label="Raw" value={Math.round(accuracy > 0 ? wpm / accuracy : wpm).toString()} />
+                        <StatBox label="Raw" value={Math.round(rawWpm).toString()} />
                         <StatBox label="Characters" value={`${(contentLength ?? 0) - errors}/${errors}`} helper="correct/incorrect" />
                         <StatBox label="Time" value={formatDuration(timeMs)} />
                     </Box>

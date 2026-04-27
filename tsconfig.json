@@ -37,6 +37,11 @@
   ],
   "exclude": [
     "node_modules",
-    "scripts"
+    "scripts",
+    ".claude",
+    ".next",
+    "coverage",
+    "playwright-report",
+    "test-results"
   ]
 }

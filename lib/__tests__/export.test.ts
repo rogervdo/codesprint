@@ -5,6 +5,7 @@ describe("generateTextSummary", () => {
     it("generates a formatted text summary", () => {
         const data: ShareCardData = {
             wpm: 65,
+            rawWpm: 72,
             accuracy: 0.95,
             patternScore: 88,
             snippetTitle: "Two Sum",
@@ -26,6 +27,7 @@ describe("generateTextSummary", () => {
     it("omits pattern score when undefined", () => {
         const data: ShareCardData = {
             wpm: 50,
+            rawWpm: 57,
             accuracy: 0.90,
             snippetTitle: "Array Sort",
             language: "javascript",

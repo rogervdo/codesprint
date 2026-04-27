@@ -40,7 +40,7 @@ export default function AnalyticsModal({ isOpen, onOpenChange }: AnalyticsModalP
                             <DialogTitle fontSize="xl" fontWeight="bold" color="var(--accent)">Analytics</DialogTitle>
                         </DialogHeader>
                         <DialogBody py={4}>
-                            <AnalyticsDashboard onClose={() => onOpenChange({ open: false })} />
+                            <AnalyticsDashboard />
                         </DialogBody>
                     </DialogContent>
                 </DialogPositioner>

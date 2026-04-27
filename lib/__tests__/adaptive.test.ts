@@ -1,12 +1,30 @@
 import { describe, it, expect } from "vitest";
 import {
   computeEMA,
+  describeDifficultyTransition,
   getDefaultSkillModel,
   computeDifficultyTransition,
   updateSkillModel,
   type SkillModelRecord,
   type SessionResult,
 } from "@/lib/adaptive";
+
+describe("describeDifficultyTransition", () => {
+  it("preserves promoted, demoted, and unchanged reasons", () => {
+    expect(describeDifficultyTransition("easy", "medium")).toEqual({
+      newDifficulty: "medium",
+      reason: "promoted",
+    });
+    expect(describeDifficultyTransition("hard", "medium")).toEqual({
+      newDifficulty: "medium",
+      reason: "demoted",
+    });
+    expect(describeDifficultyTransition("medium", "medium")).toEqual({
+      newDifficulty: "medium",
+      reason: "unchanged",
+    });
+  });
+});
 
 describe("computeEMA", () => {
   it("computes basic EMA with default alpha", () => {

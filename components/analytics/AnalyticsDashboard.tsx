@@ -15,9 +15,6 @@ import {
 import type { SupportedLanguage } from "@/lib/snippets";
 import WeakPatternDashboard from "@/components/analytics/WeakPatternDashboard";
 
-type AnalyticsDashboardProps = {
-    onClose?: () => void;
-};
 
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
     { value: "day", label: "Last 24 Hours" },
@@ -423,7 +420,7 @@ function ProgressChart({
     );
 }
 
-export default function AnalyticsDashboard(_props: AnalyticsDashboardProps) {
+export default function AnalyticsDashboard() {
     const [timeRange, setTimeRange] = useState<TimeRange>("week");
 
     const wpmTrends = useMemo(() => getWpmTrends(timeRange), [timeRange]);

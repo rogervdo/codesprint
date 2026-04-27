@@ -86,7 +86,8 @@ export function useSessionControls({
     language,
     setLanguage,
 }: UseSessionControlsProps): UseSessionControlsReturn {
-    const [lengthPreference, setLengthPreference] = useState<LengthFilter>("short");
+    const [lengthPreference, setLengthPreferenceState] = useState<LengthFilter>("short");
+    const [explicitSnippet, setExplicitSnippet] = useState<Snippet | null>(null);
     const recentProblemIdsRef = useRef<string[]>([]);
     const recentVarianceTagsRef = useRef<string[]>([]);
     const nextPoolOffsetRef = useRef(0);
@@ -129,7 +130,22 @@ export function useSessionControls({
         [problemOptions, representativeByProblem]
     );
 
-    const [problemId, setProblemId] = useState(() => preferredProblemId);
+    const [problemId, setProblemIdState] = useState(() => preferredProblemId);
+
+    const setLanguageAndClearSnippet = useCallback((lang: SupportedLanguage) => {
+        setExplicitSnippet(null);
+        setLanguage(lang);
+    }, [setLanguage]);
+
+    const setLengthPreference = useCallback((pref: LengthFilter) => {
+        setExplicitSnippet(null);
+        setLengthPreferenceState(pref);
+    }, []);
+
+    const setProblemId = useCallback((id: string) => {
+        setExplicitSnippet(null);
+        setProblemIdState(id);
+    }, []);
 
     // Reset variation history on language/length changes.
     useEffect(() => {
@@ -141,13 +157,15 @@ export function useSessionControls({
     // Auto-sync problemId when problemOptions changes
     useEffect(() => {
         if (problemOptions.length === 0) {
-            if (problemId !== "") setProblemId("");
+            if (explicitSnippet?.problemId === problemId) return;
+            if (problemId !== "") setProblemIdState("");
             return;
         }
+        if (explicitSnippet?.problemId === problemId) return;
         if (!problemOptions.some((problem) => problem.id === problemId)) {
-            setProblemId(preferredProblemId || problemOptions[0].id);
+            setProblemIdState(preferredProblemId || problemOptions[0].id);
         }
-    }, [problemOptions, problemId, preferredProblemId]);
+    }, [problemOptions, problemId, preferredProblemId, explicitSnippet]);
 
     // Snippet options based on selected problem
     const snippetOptions = useMemo<Snippet[]>(() => {
@@ -161,28 +179,47 @@ export function useSessionControls({
         return options;
     }, [language, problemId, lengthPreference, snippets]);
 
-    const [snippetId, setSnippetId] = useState(() => snippetOptions[0]?.id ?? "");
+    const [snippetId, setSnippetIdState] = useState(() => snippetOptions[0]?.id ?? "");
+
+    const setSnippetId = useCallback((id: string) => {
+        setExplicitSnippet(null);
+        setSnippetIdState(id);
+    }, []);
 
     // Auto-sync snippetId when snippetOptions changes
     useEffect(() => {
         if (snippetOptions.length === 0) {
-            if (snippetId !== "") setSnippetId("");
+            if (explicitSnippet?.problemId === problemId && explicitSnippet.id === snippetId) return;
+            if (snippetId !== "") setSnippetIdState("");
             return;
         }
+        if (explicitSnippet?.problemId === problemId && explicitSnippet.id === snippetId) return;
         if (!snippetOptions.some((option) => option.id === snippetId)) {
-            setSnippetId(snippetOptions[0].id);
+            setSnippetIdState(snippetOptions[0].id);
         }
-    }, [snippetOptions, snippetId]);
+    }, [snippetOptions, snippetId, explicitSnippet, problemId]);
 
     // Resolve the current snippet
     const snippet = useMemo(() => {
+        const selected = snippetOptions.find((option) => option.id === snippetId);
+        if (selected) return selected;
+
+        if (
+            explicitSnippet &&
+            explicitSnippet.id === snippetId &&
+            explicitSnippet.problemId === problemId &&
+            explicitSnippet.language === language &&
+            (lengthPreference === "all" || explicitSnippet.lengthCategory === lengthPreference)
+        ) {
+            return explicitSnippet;
+        }
+
         if (snippetOptions.length === 0) {
             const filters = lengthPreference === "all" ? undefined : { length: lengthPreference };
             return getSnippet(snippets, language, filters);
         }
-        const selected = snippetOptions.find((option) => option.id === snippetId);
-        return selected ?? snippetOptions[0];
-    }, [snippetOptions, snippetId, language, lengthPreference, snippets]);
+        return snippetOptions[0];
+    }, [snippetOptions, snippetId, explicitSnippet, problemId, language, lengthPreference, snippets]);
 
     // Track recent problems + variation tags to avoid repetitive next selections.
     useEffect(() => {
@@ -210,8 +247,9 @@ export function useSessionControls({
                 const recSnippet = availableSnippets.find((s) => s.id === recommended);
                 if (recSnippet) {
                     onResetEngine();
-                    setProblemId(recSnippet.problemId);
-                    setSnippetId(recSnippet.id);
+                    setExplicitSnippet(null);
+                    setProblemIdState(recSnippet.problemId);
+                    setSnippetIdState(recSnippet.id);
                     return;
                 }
             }
@@ -245,19 +283,23 @@ export function useSessionControls({
         if (!nextProblem) return;
 
         onResetEngine();
-        setProblemId(nextProblem.id);
+        setExplicitSnippet(null);
+        setProblemIdState(nextProblem.id);
     }, [problemId, problemOptions, snippet, onResetEngine, getNextRecommendation, representativeByProblem, availableSnippets]);
 
     // Directly set a custom snippet (for AI drills)
     const setSnippet = useCallback((newSnippet: Snippet) => {
         onResetEngine();
-        setProblemId(newSnippet.problemId);
-        setSnippetId(newSnippet.id);
-    }, [onResetEngine]);
+        setExplicitSnippet(newSnippet);
+        setLanguage(newSnippet.language);
+        setLengthPreferenceState(newSnippet.lengthCategory);
+        setProblemIdState(newSnippet.problemId);
+        setSnippetIdState(newSnippet.id);
+    }, [onResetEngine, setLanguage]);
 
     return {
         language,
-        setLanguage,
+        setLanguage: setLanguageAndClearSnippet,
         lengthPreference,
         setLengthPreference,
         problemOptions,
