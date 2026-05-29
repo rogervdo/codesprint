@@ -31,7 +31,7 @@ describe("useSessionLifecycle", () => {
         errorCount: 5,
         history: [{ time: 1, wpm: 80, raw: 90, errors: 2, burst: 85 }],
         lengthCategory: "medium",
-        difficulty: "medium",
+        contentType: "template",
         onResetEngine: mockResetEngine,
     };
 
@@ -169,7 +169,7 @@ describe("useSessionLifecycle", () => {
             snippetId: defaultProps.snippetId,
             language: defaultProps.language,
             lengthCategory: defaultProps.lengthCategory,
-            difficulty: defaultProps.difficulty,
+            contentType: defaultProps.contentType,
             wpm: defaultProps.metrics.adjustedWpm,
             rawWpm: defaultProps.metrics.rawWpm,
             accuracy: defaultProps.metrics.accuracy,

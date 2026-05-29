@@ -23,7 +23,7 @@ function makeRecord(overrides: Partial<CustomSnippetRecord> = {}): CustomSnippet
             tokensUsed: 100,
             costUsd: 0.001,
             accepted: true,
-            difficulty: "medium",
+            contentType: "template",
             lengthCategory: "short",
         },
         ...overrides,
@@ -69,7 +69,7 @@ describe("toSnippet", () => {
                 tokensUsed: 0,
                 costUsd: 0,
                 accepted: true,
-                difficulty: "easy",
+                contentType: "template",
                 lengthCategory: "long",
             },
         });
@@ -107,7 +107,7 @@ describe("toSnippet", () => {
         expect(snippet.lengthCategory).toBe("long");
     });
 
-    it("uses aiMetadata.difficulty when available", () => {
+    it("uses aiMetadata.contentType when available", () => {
         const record = makeRecord({
             aiMetadata: {
                 provider: "openai",
@@ -118,18 +118,18 @@ describe("toSnippet", () => {
                 tokensUsed: 0,
                 costUsd: 0,
                 accepted: false,
-                difficulty: "hard",
+                contentType: "problem",
                 lengthCategory: "medium",
             },
         });
         const snippet = toSnippet(record);
-        expect(snippet.difficulty).toBe("hard");
+        expect(snippet.type).toBe("problem");
     });
 
-    it("defaults to medium difficulty when no aiMetadata", () => {
+    it("defaults to template when no aiMetadata", () => {
         const record = makeRecord({ aiMetadata: undefined });
         const snippet = toSnippet(record);
-        expect(snippet.difficulty).toBe("medium");
+        expect(snippet.type).toBe("template");
     });
 
     it("handles single-line content", () => {

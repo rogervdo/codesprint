@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Box, Stack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -29,9 +29,8 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useSessionControls } from "@/hooks/useSessionControls";
 import { useAchievements } from "@/hooks/useAchievements";
 import { useSpacedRepetition } from "@/hooks/useSpacedRepetition";
-import { useAdaptiveDifficulty } from "@/hooks/useAdaptiveDifficulty";
-import type { SupportedLanguage, Difficulty, SnippetLength, Snippet } from "@/lib/snippets";
-import type { DifficultyTransition } from "@/lib/adaptive";
+import type { SupportedLanguage, Snippet } from "@/lib/snippets";
+import { PLACEHOLDER_SNIPPET } from "@/lib/snippets";
 
 const CodePanel = dynamic(() => import("@/components/CodePanel"), {
     ssr: false,
@@ -41,7 +40,6 @@ const CodePanel = dynamic(() => import("@/components/CodePanel"), {
 export default function TypingSession() {
     const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
     const [isDrillPanelOpen, setIsDrillPanelOpen] = useState(false);
-    const [difficultyTransition, setDifficultyTransition] = useState<DifficultyTransition | undefined>(undefined);
     const panelContainerRef = useRef<HTMLDivElement | null>(null);
 
     // Store engine reset function in a ref to break circular dependency
@@ -55,7 +53,34 @@ export default function TypingSession() {
         setSurfaceStyle: persistSurfaceStyle,
         setShowLiveStatsDuringRun,
         setVimMode,
+        setContentType,
+        toggleProblemTopic,
+        toggleTemplateTopic,
     } = usePreferences();
+
+    const activeTopics =
+        preferences.contentType === "template"
+            ? preferences.templateTopics
+            : preferences.problemTopics;
+
+    const contentFilters = useMemo(
+        () => ({
+            types: [preferences.contentType],
+            topics: activeTopics,
+        }),
+        [preferences.contentType, activeTopics]
+    );
+
+    const handleToggleTopic = useCallback(
+        (topic: (typeof activeTopics)[number]) => {
+            if (preferences.contentType === "template") {
+                toggleTemplateTopic(topic as (typeof preferences.templateTopics)[number]);
+            } else {
+                toggleProblemTopic(topic as (typeof preferences.problemTopics)[number]);
+            }
+        },
+        [preferences.contentType, toggleProblemTopic, toggleTemplateTopic]
+    );
 
     const editorFontSize = preferences.fontSize;
     const storedSurfaceStyle = preferences.surfaceStyle ?? "panel";
@@ -88,6 +113,7 @@ export default function TypingSession() {
         getNextRecommendation: handleGetNextRecommendation,
         language: selectedLanguage,
         setLanguage: setSelectedLanguage,
+        contentFilters,
     });
 
     // Typing Engine
@@ -107,7 +133,7 @@ export default function TypingSession() {
             accuracy: engine.metrics.accuracy,
             elapsedMs: engine.elapsedMs,
             language: controls.language,
-            difficulty: controls.snippet.difficulty,
+            contentType: controls.snippet.type,
             lengthCategory: controls.snippet.lengthCategory,
             errorCount: engine.wrongChars.size,
             totalKeystrokes: engine.totalKeystrokes,
@@ -126,39 +152,27 @@ export default function TypingSession() {
     // Update ref so controls can access the recommendation function
     srRecommendationRef.current = sr.getNextRecommendation;
 
-    // Adaptive Difficulty
-    const adaptive = useAdaptiveDifficulty(controls.language, preferences.adaptiveDifficultyEnabled);
-
-    // Extract stable method refs to avoid callback identity churn
     const srUpdateMastery = sr.updateMastery;
-    const adaptiveUpdateSkillModel = adaptive.updateSkillModel;
 
-    // Session finished callback for SR + adaptive updates
-    const handleSessionFinished = useCallback((sessionData: {
-        snippetId: string;
-        language: SupportedLanguage;
-        wpm: number;
-        accuracy: number;
-        patternScore?: number;
-        difficulty: Difficulty;
-        lengthCategory: SnippetLength;
-    }) => {
-        srUpdateMastery({
-            snippetId: sessionData.snippetId,
-            language: sessionData.language,
-            accuracy: sessionData.accuracy,
-            patternScore: sessionData.patternScore,
-        });
-        if (!preferences.adaptiveDifficultyEnabled) {
-            setDifficultyTransition(undefined);
-            return;
-        }
-        void adaptiveUpdateSkillModel({
-            wpm: sessionData.wpm,
-            accuracy: sessionData.accuracy,
-            difficulty: sessionData.difficulty,
-        }).then(setDifficultyTransition);
-    }, [srUpdateMastery, adaptiveUpdateSkillModel, preferences.adaptiveDifficultyEnabled]);
+    const handleSessionFinished = useCallback(
+        (sessionData: {
+            snippetId: string;
+            language: SupportedLanguage;
+            wpm: number;
+            accuracy: number;
+            patternScore?: number;
+            contentType: import("@/lib/catalog").SnippetType;
+            lengthCategory: import("@/lib/snippets").SnippetLength;
+        }) => {
+            srUpdateMastery({
+                snippetId: sessionData.snippetId,
+                language: sessionData.language,
+                accuracy: sessionData.accuracy,
+                patternScore: sessionData.patternScore,
+            });
+        },
+        [srUpdateMastery]
+    );
 
     // Session Lifecycle (auto-advance, score saving)
     const lifecycle = useSessionLifecycle({
@@ -172,7 +186,7 @@ export default function TypingSession() {
         errorCount: engine.wrongChars.size,
         history: engine.history,
         lengthCategory: controls.snippet.lengthCategory,
-        difficulty: controls.snippet.difficulty,
+        contentType: controls.snippet.type,
         isAIDrill: controls.snippet.problemId.startsWith("ai-drill-"),
         // NEW - pass error data for AI drill weak pattern aggregation
         errors: engine.errorLog,
@@ -238,11 +252,11 @@ export default function TypingSession() {
         controls.handleNextProblem();
     }, [focus, lifecycle, controls]);
 
-    useEffect(() => {
-        if (engine.phase !== "finished") {
-            setDifficultyTransition(undefined);
-        }
-    }, [engine.phase]);
+    const handleRandomProblem = useCallback(() => {
+        focus.enableEditorFocus();
+        lifecycle.clearAutoAdvance();
+        controls.handleRandomProblem();
+    }, [focus, lifecycle, controls]);
 
     const handleDrillAccept = useCallback(async (snippet: Snippet) => {
         await refreshAIDrills();
@@ -267,8 +281,10 @@ export default function TypingSession() {
                                 <SessionControlBar
                                     language={controls.language}
                                     onLanguageChange={controls.setLanguage}
-                                    lengthPreference={controls.lengthPreference}
-                                    onLengthChange={controls.setLengthPreference}
+                                    contentType={preferences.contentType}
+                                    onContentTypeChange={setContentType}
+                                    selectedTopics={activeTopics}
+                                    onToggleTopic={handleToggleTopic}
                                     surfaceStyle={storedSurfaceStyle}
                                     onSurfaceChange={persistSurfaceStyle}
                                     onStart={handleStart}
@@ -277,7 +293,10 @@ export default function TypingSession() {
                                     isTerminalMode={isTerminalMode}
                                     prefersReducedMotion={prefersReducedMotion}
                                     dueCount={sr.dueCount}
-                                    suggestedDifficulty={adaptive.suggestedDifficulty}
+                                    canStart={
+                                        controls.hasMatchingSnippets &&
+                                        controls.snippet.id !== PLACEHOLDER_SNIPPET.id
+                                    }
                                     onOpenAIDrill={() => setIsDrillPanelOpen(true)}
                                 />
                             )}
@@ -287,7 +306,7 @@ export default function TypingSession() {
                                 <Box w="100%" position="relative">
                                     <motion.div
                                         ref={panelContainerRef}
-                                        key={`${controls.snippet.id}-${controls.language}-${controls.lengthPreference}`}
+                                        key={`${controls.snippet.id}-${controls.language}-${preferences.contentType}-${activeTopics.join(",")}`}
                                         {...panelMotion}
                                         layout
                                         style={{ display: "flex", justifyContent: "center", width: "100%" }}
@@ -303,6 +322,7 @@ export default function TypingSession() {
                                                 currentProblem={controls.currentProblem}
                                                 problemCount={controls.problemOptions.length}
                                                 onNextProblem={handleNextProblem}
+                                                onRandomProblem={handleRandomProblem}
                                                 onLeaderboardOpen={() => setIsLeaderboardOpen(true)}
                                             />
 
@@ -357,7 +377,7 @@ export default function TypingSession() {
                         snippetTitle={controls.snippet.title}
                         snippetId={controls.snippet.id}
                         language={controls.language}
-                        difficulty={controls.snippet.difficulty}
+                        contentType={controls.snippet.type}
                         lengthCategory={controls.snippet.lengthCategory}
                         errorLog={engine.errorLog}
                         history={engine.history}
@@ -370,7 +390,6 @@ export default function TypingSession() {
                         contentLength={controls.snippet.content.length}
                         xpGained={achievements.xpGained}
                         newlyUnlocked={achievements.newlyUnlocked}
-                        difficultyTransition={preferences.adaptiveDifficultyEnabled ? difficultyTransition : undefined}
                         isAIDrill={controls.snippet.problemId.startsWith("ai-drill-")}
                     />
                 )}

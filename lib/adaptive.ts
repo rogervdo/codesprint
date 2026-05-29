@@ -1,4 +1,4 @@
-import type { Difficulty } from "@/lib/snippets";
+export type Difficulty = "easy" | "medium" | "hard";
 
 export type SessionResult = {
   wpm: number;

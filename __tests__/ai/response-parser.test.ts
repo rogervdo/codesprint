@@ -9,7 +9,7 @@ import type { DrillRequest, DrillResponse } from "@/lib/ai/types";
 function makeRequest(overrides: Partial<DrillRequest> = {}): DrillRequest {
     return {
         language: "python",
-        difficulty: "medium",
+        contentType: "template",
         lengthCategory: "medium",
         weakPatterns: [],
         targetTokenCategories: [],
@@ -49,7 +49,6 @@ function makeValidResponse(overrides: Partial<DrillResponse> = {}): DrillRespons
         explanation: "Implements binary search on a sorted array.",
         focusAreas: ["keyword", "operator"],
         reasoning: "User struggles with comparison operators.",
-        estimatedDifficulty: "medium",
         ...overrides,
     };
 }
@@ -89,16 +88,6 @@ describe("validateDrillResponse", () => {
             }
         });
 
-        it("rejects invalid estimatedDifficulty value", () => {
-            const result = validateDrillResponse(
-                { ...makeValidResponse(), estimatedDifficulty: "impossible" },
-                makeRequest(),
-            );
-            expect(result.valid).toBe(false);
-            if (!result.valid) {
-                expect(result.code).toBe("SCHEMA_ERROR");
-            }
-        });
 
         it("rejects when focusAreas is not an array", () => {
             const result = validateDrillResponse(
@@ -220,70 +209,6 @@ describe("validateDrillResponse", () => {
             }
         });
 
-        it("allows stdlib includes for cpp", () => {
-            const content = [
-                "#include <vector>",
-                "#include <algorithm>",
-                "int main() {",
-                "    std::vector<int> v = {3, 1, 2};",
-                "    std::sort(v.begin(), v.end());",
-                "    return 0;",
-                "}",
-            ].join("\n");
-            const response = makeValidResponse({ content });
-            const result = validateDrillResponse(response, makeRequest({ language: "cpp", lengthCategory: "short" }));
-            expect(result.valid).toBe(true);
-        });
-
-        it("rejects local headers for cpp", () => {
-            const content = [
-                '#include "myheader.h"',
-                "int main() {",
-                "    return 0;",
-                "}",
-            ].join("\n");
-            const response = makeValidResponse({ content });
-            const result = validateDrillResponse(response, makeRequest({ language: "cpp", lengthCategory: "short" }));
-            expect(result.valid).toBe(false);
-            if (!result.valid) {
-                expect(result.code).toBe("IMPORT_VIOLATION");
-            }
-        });
-
-        it("allows stdlib imports for java", () => {
-            const content = [
-                "import java.util.List;",
-                "import java.util.ArrayList;",
-                "public class Main {",
-                "    public static void main(String[] args) {",
-                "        List<String> list = new ArrayList<>();",
-                "        list.add(\"hello\");",
-                "        System.out.println(list);",
-                "    }",
-                "}",
-            ].join("\n");
-            const response = makeValidResponse({ content });
-            const result = validateDrillResponse(response, makeRequest({ language: "java", lengthCategory: "short" }));
-            expect(result.valid).toBe(true);
-        });
-
-        it("rejects third-party imports for java", () => {
-            const content = [
-                "import com.google.gson.Gson;",
-                "public class Main {",
-                "    public static void main(String[] args) {",
-                "        Gson gson = new Gson();",
-                "        System.out.println(gson);",
-                "    }",
-                "}",
-            ].join("\n");
-            const response = makeValidResponse({ content });
-            const result = validateDrillResponse(response, makeRequest({ language: "java", lengthCategory: "short" }));
-            expect(result.valid).toBe(false);
-            if (!result.valid) {
-                expect(result.code).toBe("IMPORT_VIOLATION");
-            }
-        });
     });
 
     // -----------------------------------------------------------------------

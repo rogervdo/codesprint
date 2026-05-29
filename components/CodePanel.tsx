@@ -21,7 +21,7 @@ type CodePanelProps = {
     content: string;
     cursorChar: number;
     wrongChars: Set<number>;
-    language: "javascript" | "python" | "java" | "cpp";
+    language: "javascript" | "python";
     caretErrorActive: boolean;
     onReady?: (focusEditor: () => void) => void;
     fontSize: number;

@@ -14,25 +14,11 @@ describe("getWeights", () => {
         expect(weights.whitespace).toBe(0.5);
     });
 
-    it("returns default weights for java (no overrides)", () => {
-        const weights = getWeights("java");
-        expect(weights.keyword).toBe(1.5);
-        expect(weights.whitespace).toBe(0.5);
-    });
-
     it("applies python overrides (whitespace = 0.7)", () => {
         const weights = getWeights("python");
         expect(weights.whitespace).toBe(0.7);
         expect(weights.keyword).toBe(1.5);
         expect(weights.operator).toBe(1.5);
-    });
-
-    it("applies cpp overrides (operator = 1.6, delimiter = 1.3)", () => {
-        const weights = getWeights("cpp");
-        expect(weights.operator).toBe(1.6);
-        expect(weights.delimiter).toBe(1.3);
-        expect(weights.keyword).toBe(1.5);
-        expect(weights.whitespace).toBe(0.5);
     });
 
     it("returns a new object (not a reference to defaults)", () => {
@@ -47,6 +33,5 @@ describe("getWeight", () => {
     it("returns weight for a specific category and language", () => {
         expect(getWeight("python", "whitespace")).toBe(0.7);
         expect(getWeight("javascript", "whitespace")).toBe(0.5);
-        expect(getWeight("cpp", "operator")).toBe(1.6);
     });
 });

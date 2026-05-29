@@ -1,3 +1,13 @@
+import type { ProblemTopic, SnippetType, TemplateTopic } from "@/lib/catalog";
+import {
+    DEFAULT_CONTENT_TYPE,
+    DEFAULT_PROBLEM_TOPICS,
+    DEFAULT_TEMPLATE_TOPICS,
+    sanitizeContentType,
+    sanitizeProblemTopics,
+    sanitizeTemplateTopics,
+} from "@/lib/catalog";
+
 export type ThemePreset =
     | "midnight"
     | "vaporwave"
@@ -69,7 +79,10 @@ export type PreferencesState = {
     debugGapBuffer: boolean;
     spacedRepetitionEnabled: boolean;
     adaptiveDifficultyEnabled: boolean;
-    // NEW - AI drill preferences
+    contentType: SnippetType;
+    problemTopics: ProblemTopic[];
+    templateTopics: TemplateTopic[];
+    // AI drill preferences
     aiDrillsEnabled: boolean;
     aiProvider: "claude" | "openai" | "fireworks";
     aiMaxDrillsPerDay: number;
@@ -406,7 +419,10 @@ export const DEFAULT_PREFERENCES: PreferencesState = {
     debugGapBuffer: false,
     spacedRepetitionEnabled: false,
     adaptiveDifficultyEnabled: false,
-    // NEW - AI drill preferences
+    contentType: DEFAULT_CONTENT_TYPE,
+    problemTopics: DEFAULT_PROBLEM_TOPICS,
+    templateTopics: DEFAULT_TEMPLATE_TOPICS,
+    // AI drill preferences
     aiDrillsEnabled: false,
     aiProvider: "claude",
     aiMaxDrillsPerDay: 20,
@@ -473,7 +489,15 @@ export function sanitizePreferences(value: unknown): PreferencesState {
             typeof source.adaptiveDifficultyEnabled === "boolean"
                 ? source.adaptiveDifficultyEnabled
                 : DEFAULT_PREFERENCES.adaptiveDifficultyEnabled,
-        // NEW - AI drill preferences
+        contentType: sanitizeContentType(
+            (source as { contentType?: unknown }).contentType,
+            (source as { contentTypes?: unknown }).contentTypes
+        ),
+        problemTopics: sanitizeProblemTopics(
+            source.problemTopics ?? (source as { topics?: unknown }).topics
+        ),
+        templateTopics: sanitizeTemplateTopics(source.templateTopics),
+        // AI drill preferences
         aiDrillsEnabled:
             typeof source.aiDrillsEnabled === "boolean"
                 ? source.aiDrillsEnabled

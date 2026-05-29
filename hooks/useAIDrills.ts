@@ -144,7 +144,7 @@ export function useAIDrills(
                     tokensUsed: meta.tokensUsed,
                     costUsd: meta.costUsd,
                     accepted: true,
-                    difficulty: request.difficulty,
+                    contentType: request.contentType ?? "template",
                     lengthCategory: request.lengthCategory,
                 },
             };

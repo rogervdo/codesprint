@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { saveScore } from "@/lib/leaderboard";
 import { createSessionAsync } from "@/lib/storage/session-history";
-import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
+import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 import type { HistoryEntry, ErrorEntry } from "@/hooks/useTypingEngine";
 import type { Phase } from "./useFocusManagement";
 
@@ -23,7 +24,7 @@ export interface UseSessionLifecycleProps {
     errorCount: number;
     history: HistoryEntry[];
     lengthCategory: SnippetLength;
-    difficulty: Difficulty;
+    contentType: SnippetType;
     isAIDrill?: boolean;
     // NEW - for AI drill weak pattern aggregation
     errors?: ErrorEntry[];
@@ -35,7 +36,7 @@ export interface UseSessionLifecycleProps {
         wpm: number;
         accuracy: number;
         patternScore?: number;
-        difficulty: Difficulty;
+        contentType: SnippetType;
         lengthCategory: SnippetLength;
     }) => void;
 }
@@ -66,7 +67,7 @@ export function useSessionLifecycle({
     errorCount,
     history,
     lengthCategory,
-    difficulty,
+    contentType,
     isAIDrill,
     errors,
     snippetContent,
@@ -124,7 +125,7 @@ export function useSessionLifecycle({
             snippetId,
             language,
             lengthCategory,
-            difficulty,
+            contentType,
             ...(isAIDrill !== undefined ? { isAIDrill } : {}),
             wpm: metrics.adjustedWpm,
             rawWpm: metrics.rawWpm,
@@ -149,11 +150,11 @@ export function useSessionLifecycle({
                 wpm: metrics.adjustedWpm,
                 accuracy: metrics.accuracy,
                 patternScore: metrics.patternScore,
-                difficulty,
+                contentType,
                 lengthCategory,
             });
         }
-    }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, difficulty, isAIDrill, onSessionFinished, errors, snippetContent]);
+    }, [phase, metrics.adjustedWpm, metrics.rawWpm, metrics.accuracy, metrics.patternScore, language, snippetId, elapsedMs, totalKeystrokes, correctKeystrokes, errorCount, history, lengthCategory, contentType, isAIDrill, onSessionFinished, errors, snippetContent]);
 
     return {
         autoAdvanceDeadline,

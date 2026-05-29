@@ -2,7 +2,41 @@ import { describe, it, expect, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useState } from "react";
 import { useSessionControls } from "../useSessionControls";
-import { CURATED_SNIPPETS_LIST, type Snippet, type SupportedLanguage } from "@/lib/snippets";
+import { normalizeCatalog, type Snippet, type SupportedLanguage } from "@/lib/snippets";
+import { DEFAULT_PROBLEM_TOPICS } from "@/lib/catalog";
+
+const TEST_SNIPPETS = normalizeCatalog([
+    {
+        id: "py-bfs-template",
+        title: "BFS Template",
+        language: "python",
+        type: "template",
+        topics: ["bfs-tree"],
+        content: "from collections import deque\n\ndef bfs():\n    pass\n",
+    },
+    {
+        id: "py-dfs-template",
+        title: "DFS Template",
+        language: "python",
+        type: "template",
+        topics: ["dfs-tree"],
+        content: "def dfs(node):\n    pass\n",
+    },
+    {
+        id: "js-graph-problem",
+        title: "Graph Problem",
+        language: "javascript",
+        type: "problem",
+        topics: ["graph"],
+        content: "function solve() {\n  return 1;\n}\n",
+    },
+]);
+
+const TEMPLATE_FILTERS = {
+    types: ["template" as const],
+    topics: ["bfs-tree" as const, "dfs-tree" as const],
+};
+const PROBLEM_FILTERS = { types: ["problem" as const], topics: DEFAULT_PROBLEM_TOPICS };
 
 function makeSnippet(overrides: Partial<Snippet> = {}): Snippet {
     return {
@@ -11,8 +45,9 @@ function makeSnippet(overrides: Partial<Snippet> = {}): Snippet {
         title: "Base",
         content: "def solve(values: list[int]) -> int:\n    return sum(values)\n",
         language: "python",
+        type: "template",
+        topics: ["bfs-tree"],
         lengthCategory: "short",
-        difficulty: "easy",
         lines: 2,
         ...overrides,
     };
@@ -21,17 +56,23 @@ function makeSnippet(overrides: Partial<Snippet> = {}): Snippet {
 describe("useSessionControls", () => {
     const mockResetEngine = vi.fn();
 
-    function renderControls(snippets = CURATED_SNIPPETS_LIST) {
+    function renderControls(snippets = TEST_SNIPPETS) {
         return renderHook(() => {
             const [language, setLanguage] = useState<SupportedLanguage>("python");
-            return useSessionControls({ snippets, onResetEngine: mockResetEngine, language, setLanguage });
+            return useSessionControls({
+                snippets,
+                onResetEngine: mockResetEngine,
+                language,
+                setLanguage,
+                contentFilters: TEMPLATE_FILTERS,
+            });
         });
     }
 
-    it("initializes with default language (python) and length (short)", () => {
+    it("initializes with default language (python)", () => {
         const { result } = renderControls();
         expect(result.current.language).toBe("python");
-        expect(result.current.lengthPreference).toBe("short");
+        expect(result.current.hasMatchingSnippets).toBe(true);
     });
 
     it("returns problem options for the selected language", () => {
@@ -63,23 +104,28 @@ describe("useSessionControls", () => {
         const baseSnippet = makeSnippet({
             id: "python:short",
             problemId: "python:short",
-            lengthCategory: "short",
+            type: "problem",
+            topics: ["graph"],
         });
         const aiDrill = makeSnippet({
             id: "ai-drill-record-1",
             problemId: "ai-drill-ai-drill-record-1",
             title: "Generated Loop Drill",
-            content: "class Solution {\n    int run() { return 1; }\n}\n",
-            language: "java",
-            lengthCategory: "medium",
-            difficulty: "hard",
-            lines: 3,
+            content: "def run():\n    return 1\n",
+            type: "problem",
+            topics: ["graph"],
         });
 
         const { result, rerender } = renderHook(
             ({ snippets }) => {
                 const [language, setLanguage] = useState<SupportedLanguage>("python");
-                return useSessionControls({ snippets, onResetEngine: mockResetEngine, language, setLanguage });
+                return useSessionControls({
+                    snippets,
+                    onResetEngine: mockResetEngine,
+                    language,
+                    setLanguage,
+                    contentFilters: PROBLEM_FILTERS,
+                });
             },
             { initialProps: { snippets: [baseSnippet] } }
         );
@@ -90,22 +136,24 @@ describe("useSessionControls", () => {
         });
 
         expect(mockResetEngine).toHaveBeenCalledTimes(1);
-        expect(result.current.language).toBe("java");
-        expect(result.current.lengthPreference).toBe("medium");
+        expect(result.current.language).toBe("python");
         expect(result.current.problemId).toBe(aiDrill.problemId);
         expect(result.current.snippetId).toBe(aiDrill.id);
-        expect(result.current.snippet).toMatchObject({
-            id: aiDrill.id,
-            problemId: aiDrill.problemId,
-            language: "java",
-            difficulty: "hard",
-            lengthCategory: "medium",
-        });
 
         rerender({ snippets: [baseSnippet, aiDrill] });
 
         expect(result.current.snippet.id).toBe(aiDrill.id);
         expect(result.current.problemOptions.some((problem) => problem.id === aiDrill.problemId)).toBe(true);
+    });
+
+    it("picks a different problem when randomizing", () => {
+        const { result } = renderControls();
+        const firstProblemId = result.current.problemId;
+        act(() => {
+            result.current.handleRandomProblem();
+        });
+        expect(result.current.problemId).not.toBe(firstProblemId);
+        expect(mockResetEngine).toHaveBeenCalled();
     });
 
     it("navigates to next problem", () => {
@@ -118,71 +166,5 @@ describe("useSessionControls", () => {
             expect(result.current.problemId).not.toBe(firstProblemId);
         }
         expect(mockResetEngine).toHaveBeenCalled();
-    });
-
-    it("changes length preference", () => {
-        const { result } = renderControls();
-        act(() => {
-            result.current.setLengthPreference("medium");
-        });
-        expect(result.current.lengthPreference).toBe("medium");
-    });
-
-    it("prefers a higher-variance problem when initializing", () => {
-        const snippets: Snippet[] = [
-            makeSnippet({
-                id: "python:pandas-a",
-                problemId: "python:pandas-a",
-                title: "Pandas A",
-                content: "import pandas as pd\n\ndef pandas_a(df: pd.DataFrame) -> pd.DataFrame:\n",
-                lines: 3,
-            }),
-            makeSnippet({
-                id: "python:full-a",
-                problemId: "python:full-a",
-                title: "Full A",
-                content: "def full_a(values: list[int]) -> int:\n    total = 0\n    for value in values:\n        total += value\n    return total\n",
-                lines: 5,
-            }),
-        ];
-
-        const { result } = renderControls(snippets);
-        expect(result.current.problemId).toBe("python:full-a");
-    });
-
-    it("skips low-variance pandas stubs when choosing next problem if alternatives exist", () => {
-        const snippets: Snippet[] = [
-            makeSnippet({
-                id: "python:pandas-a",
-                problemId: "python:pandas-a",
-                title: "Pandas A",
-                content: "import pandas as pd\n\ndef pandas_a(df: pd.DataFrame) -> pd.DataFrame:\n",
-                lines: 3,
-            }),
-            makeSnippet({
-                id: "python:full-a",
-                problemId: "python:full-a",
-                title: "Full A",
-                content: "def full_a(values: list[int]) -> int:\n    return sum(values)\n",
-                lines: 2,
-            }),
-            makeSnippet({
-                id: "python:full-b",
-                problemId: "python:full-b",
-                title: "Full B",
-                content: "def full_b(values: list[int]) -> int:\n    count = 0\n    for value in values:\n        count += value\n    return count\n",
-                lines: 5,
-            }),
-        ];
-
-        const { result } = renderControls(snippets);
-        const initialProblemId = result.current.problemId;
-
-        act(() => {
-            result.current.handleNextProblem();
-        });
-
-        expect(result.current.problemId).not.toBe("python:pandas-a");
-        expect(result.current.problemId).not.toBe(initialProblemId);
     });
 });

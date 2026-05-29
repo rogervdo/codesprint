@@ -1,9 +1,10 @@
-import type { Difficulty, SnippetLength } from "@/lib/snippets";
+import type { SnippetLength } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 
 export type XpInput = {
     wpm: number;
     accuracy: number;
-    difficulty: Difficulty;
+    contentType: SnippetType;
     lengthCategory: SnippetLength;
 };
 
@@ -11,7 +12,7 @@ export type XpBreakdown = {
     base: number;
     wpmBonus: number;
     accuracyBonus: number;
-    difficultyMult: number;
+    typeMult: number;
     lengthMult: number;
 };
 
@@ -27,10 +28,9 @@ export type LevelInfo = {
     progress: number;
 };
 
-const DIFFICULTY_MULTIPLIERS: Record<Difficulty, number> = {
-    easy: 1,
-    medium: 1.5,
-    hard: 2,
+const TYPE_MULTIPLIERS: Record<SnippetType, number> = {
+    template: 1,
+    problem: 1.5,
 };
 
 const LENGTH_MULTIPLIERS: Record<SnippetLength, number> = {
@@ -43,12 +43,10 @@ export function computeSessionXp(input: XpInput): XpResult {
     const base = 10;
     const wpmBonus = input.wpm * 0.5;
     const accuracyBonus = input.accuracy > 0.95 ? 20 : 0;
-    const difficultyMult = DIFFICULTY_MULTIPLIERS[input.difficulty];
+    const typeMult = TYPE_MULTIPLIERS[input.contentType];
     const lengthMult = LENGTH_MULTIPLIERS[input.lengthCategory];
 
-    const sessionXp = Math.round(
-        (base + wpmBonus + accuracyBonus) * difficultyMult * lengthMult
-    );
+    const sessionXp = Math.round((base + wpmBonus + accuracyBonus) * typeMult * lengthMult);
 
     return {
         sessionXp,
@@ -56,7 +54,7 @@ export function computeSessionXp(input: XpInput): XpResult {
             base,
             wpmBonus,
             accuracyBonus,
-            difficultyMult,
+            typeMult,
             lengthMult,
         },
     };

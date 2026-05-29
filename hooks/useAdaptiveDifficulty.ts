@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { SupportedLanguage, Difficulty } from "@/lib/snippets";
-import type { SkillModelRecord, DifficultyTransition, SessionResult } from "@/lib/adaptive";
+import type { SupportedLanguage } from "@/lib/snippets";
+import type { SkillModelRecord, DifficultyTransition, SessionResult, Difficulty } from "@/lib/adaptive";
 import {
     updateSkillModel as pureUpdateSkillModel,
     getDefaultSkillModel,

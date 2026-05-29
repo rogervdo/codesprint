@@ -111,7 +111,14 @@ export function AIDrillPanel({ isOpen, onClose, onAccept, language }: AIDrillPan
     const isPreview = ai.state.status === "preview";
     const isError = ai.state.status === "error";
 
-    const drill = isPreview ? (ai.state as { status: "preview"; drill: { title: string; content: string; explanation: string; focusAreas: string[]; estimatedDifficulty: "easy" | "medium" | "hard"; }; costUsd: number; provider: "claude" | "openai" | "fireworks"; }).drill : null;
+    const drill = isPreview
+        ? (ai.state as {
+              status: "preview";
+              drill: { title: string; content: string; explanation: string; focusAreas: string[]; reasoning: string };
+              costUsd: number;
+              provider: "claude" | "openai" | "fireworks";
+          }).drill
+        : null;
     const cost = isPreview ? (ai.state as { status: "preview"; costUsd: number; }).costUsd : 0;
     const provider = isPreview ? (ai.state as { status: "preview"; provider: "claude" | "openai" | "fireworks"; }).provider : null;
 
@@ -225,9 +232,6 @@ export function AIDrillPanel({ isOpen, onClose, onAccept, language }: AIDrillPan
                         {/* Metadata */}
                         {isPreview && drill && (
                             <HStack gap={4} fontSize="xs" color="gray.500" justify="center" width="100%">
-                                <Badge size="sm" colorScheme={drill.estimatedDifficulty === "easy" ? "green" : drill.estimatedDifficulty === "medium" ? "yellow" : "red"}>
-                                    {drill.estimatedDifficulty}
-                                </Badge>
                                 <Text>{lineCount} lines</Text>
                                 <Text>~${cost.toFixed(3)}</Text>
                                 <Text>{provider === "claude" ? "claude-haiku-4-5" : provider === "fireworks" ? "llama-v3p1-70b" : "gpt-4o-mini"}</Text>

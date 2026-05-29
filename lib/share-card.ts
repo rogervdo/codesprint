@@ -18,7 +18,7 @@ export type ShareCardData = {
     patternScore?: number;
     snippetTitle: string;
     language: string;
-    difficulty: string;
+    contentType: string;
     timeMs: number;
     /** WPM history for sparkline */
     history: { time: number; wpm: number }[];
@@ -138,7 +138,7 @@ export async function renderShareCard(data: ShareCardData): Promise<HTMLCanvasEl
     const pillLabels = [
         data.snippetTitle,
         data.language.toUpperCase(),
-        capitalize(data.difficulty),
+        capitalize(data.contentType),
     ];
     ctx.textAlign = "center";
     const pillX = CARD_WIDTH / 2 - ((pillLabels.join(" · ").length * 6.5) / 2);
@@ -401,7 +401,7 @@ export function downloadCanvas(canvas: HTMLCanvasElement): void {
 export function generateTextSummary(data: ShareCardData): string {
     const parts = [
         "CodeSprint",
-        `${data.snippetTitle} (${data.language.toUpperCase()}, ${capitalize(data.difficulty)})`,
+        `${data.snippetTitle} (${data.language.toUpperCase()}, ${capitalize(data.contentType)})`,
         `${Math.round(data.wpm)} WPM`,
         `${Math.round(data.accuracy * 100)}% accuracy`,
     ];

@@ -22,8 +22,8 @@ type ResultCardProps = {
     errors: number;
     snippetTitle: string;
     snippetId: string;
-    language: "javascript" | "python" | "java" | "cpp";
-    difficulty: string;
+    language: "javascript" | "python";
+    contentType: string;
     lengthCategory: string;
     errorLog: ErrorEntry[];
     onNext?: () => void;
@@ -59,7 +59,7 @@ export default function ResultCard({
     snippetTitle,
     snippetId,
     language,
-    difficulty,
+    contentType,
     lengthCategory,
     errorLog,
     history,
@@ -110,10 +110,10 @@ export default function ResultCard({
         patternScore,
         snippetTitle: snippetTitle || snippetId,
         language,
-        difficulty,
+        contentType,
         timeMs,
         history: history.map((h) => ({ time: h.time, wpm: h.wpm })),
-    }), [wpm, rawWpm, accuracy, patternScore, snippetTitle, snippetId, language, difficulty, timeMs, history]);
+    }), [wpm, rawWpm, accuracy, patternScore, snippetTitle, snippetId, language, contentType, timeMs, history]);
 
     const handleShare = useCallback(async () => {
         setIsSharing(true);
@@ -139,10 +139,10 @@ export default function ResultCard({
         () => [
             { label: "Problem", value: snippetTitle || snippetId },
             { label: "Language", value: language.toUpperCase() },
-            { label: "Difficulty", value: capitalize(difficulty) },
+            { label: "Type", value: capitalize(contentType) },
             { label: "Length", value: capitalize(lengthCategory) },
         ],
-        [difficulty, language, lengthCategory, snippetId, snippetTitle]
+        [contentType, language, lengthCategory, snippetId, snippetTitle]
     );
 
     // Simple normal distribution approximation for WPM percentiles

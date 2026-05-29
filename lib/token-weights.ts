@@ -34,11 +34,6 @@ const LANGUAGE_OVERRIDES: Partial<Record<SupportedLanguage, Partial<TokenWeights
         // Python's indentation IS syntax, so whitespace matters more
         whitespace: 0.7,
     },
-    cpp: {
-        // C++ templates and operators are syntactically critical
-        operator: 1.6,
-        delimiter: 1.3,
-    },
 };
 
 // ---------------------------------------------------------------------------
@@ -46,7 +41,7 @@ const LANGUAGE_OVERRIDES: Partial<Record<SupportedLanguage, Partial<TokenWeights
 // ---------------------------------------------------------------------------
 
 const CACHED_WEIGHTS: Record<string, TokenWeights> = {};
-for (const lang of ["javascript", "python", "java", "cpp"] as SupportedLanguage[]) {
+for (const lang of ["javascript", "python"] as SupportedLanguage[]) {
     const overrides = LANGUAGE_OVERRIDES[lang];
     CACHED_WEIGHTS[lang] = overrides ? { ...DEFAULT_WEIGHTS, ...overrides } : DEFAULT_WEIGHTS;
 }

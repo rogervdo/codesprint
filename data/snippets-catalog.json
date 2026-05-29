@@ -1,0 +1,206 @@
+[
+  {
+    "id": "python:template-backtracking-aggregation",
+    "problemId": "python:template-backtracking-aggregation",
+    "title": "Backtracking — Aggregation",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "backtracking-aggregation"
+    ],
+    "sourceSlug": "backtracking-aggregation",
+    "content": "def dfs(start_index, [...additional states]):\n    if is_leaf(start_index):\n        return 1\n    ans = initial_value\n    for edge in get_edges(start_index, [...additional states]):\n        if additional states:\n            update([...additional states])\n        ans = aggregate(ans, dfs(start_index + len(edge), [...additional states]))\n        if additional states:\n            revert([...additional states])\n    return ans\n"
+  },
+  {
+    "id": "python:template-backtracking-basic",
+    "problemId": "python:template-backtracking-basic",
+    "title": "Backtracking — Basic",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "backtracking-basic"
+    ],
+    "sourceSlug": "backtracking-basic",
+    "content": "ans = []\n\ndef dfs(start_index, path, [...additional states]):\n    if is_leaf(start_index):\n        ans.append(path[:])  # add a copy of the path to the result\n        return\n    for edge in get_edges(start_index, [...additional states]):\n        # prune if needed\n        if not is_valid(edge):\n            continue\n        path.add(edge)\n        if additional states:\n            update(...additional states)\n        dfs(start_index + len(edge), path, [...additional states])\n        # revert(...additional states) if necessary e.g. permutations\n        path.pop()\n"
+  },
+  {
+    "id": "python:template-binary-search",
+    "problemId": "python:template-binary-search",
+    "title": "Binary Search",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "binary-search"
+    ],
+    "sourceSlug": "binary-search",
+    "content": "def binary_search(arr: List[int], target: int) -> int:\n    left, right = 0, len(arr) - 1\n    first_true_index = -1\n    while left <= right:\n        mid = (left + right) // 2\n        if feasible(mid):\n            first_true_index = mid\n            right = mid - 1\n        else:\n            left = mid + 1\n\n    return first_true_index\n"
+  },
+  {
+    "id": "python:template-bfs-tree",
+    "problemId": "python:template-bfs-tree",
+    "title": "BFS on Tree",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "bfs-tree"
+    ],
+    "sourceSlug": "bfs-tree",
+    "content": "from collections import deque\n\ndef bfs(root):\n    queue = deque([root])\n    while len(queue) > 0:\n        node = queue.popleft()\n        for child in node.children:\n            if is_goal(child):\n                return FOUND(child)\n            queue.append(child)\n    return NOT_FOUND\n"
+  },
+  {
+    "id": "python:template-dfs-tree",
+    "problemId": "python:template-dfs-tree",
+    "title": "DFS on Tree",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "dfs-tree"
+    ],
+    "sourceSlug": "dfs-tree",
+    "content": "def dfs(root, target):\n    if root is None:\n        return None\n    if root.val == target:\n        return root\n    left = dfs(root.left, target)\n    if left is not None:\n        return left\n    return dfs(root.right, target)\n"
+  },
+  {
+    "id": "python:template-bfs-graph",
+    "problemId": "python:template-bfs-graph",
+    "title": "BFS on Graphs",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "bfs-graph"
+    ],
+    "sourceSlug": "bfs-graph",
+    "content": "from collections import deque\n\ndef bfs(root):\n    queue = deque([root])\n    visited = set([root])\n    while len(queue) > 0:\n        node = queue.popleft()\n        for neighbor in get_neighbors(node):\n            if neighbor in visited:\n                continue\n            queue.append(neighbor)\n            visited.add(neighbor)\n"
+  },
+  {
+    "id": "python:template-dfs-graph",
+    "problemId": "python:template-dfs-graph",
+    "title": "DFS on Graphs",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "dfs-graph"
+    ],
+    "sourceSlug": "dfs-graph",
+    "content": "def dfs(node, visited):\n    visited.add(node)\n    for neighbor in get_neighbors(node):\n        if neighbor in visited:\n            continue\n        dfs(neighbor, visited)\n"
+  },
+  {
+    "id": "python:template-bfs-matrix",
+    "problemId": "python:template-bfs-matrix",
+    "title": "BFS on a Matrix",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "bfs-matrix"
+    ],
+    "sourceSlug": "bfs-matrix",
+    "content": "from collections import deque\n\nnum_rows, num_cols = len(grid), len(grid[0])\n\ndef get_neighbors(coord):\n    row, col = coord\n    delta_row = [-1, 0, 1, 0]\n    delta_col = [0, 1, 0, -1]\n    res = []\n    for i in range(len(delta_row)):\n        neighbor_row = row + delta_row[i]\n        neighbor_col = col + delta_col[i]\n        if 0 <= neighbor_row < num_rows and 0 <= neighbor_col < num_cols:\n            res.append((neighbor_row, neighbor_col))\n    return res\n\ndef bfs(starting_node):\n    queue = deque([starting_node])\n    visited = set([starting_node])\n    while len(queue) > 0:\n        node = queue.popleft()\n        for neighbor in get_neighbors(node):\n            if neighbor in visited:\n                continue\n            # Do stuff with the node if required\n            # ...\n            queue.append(neighbor)\n            visited.add(neighbor)\n"
+  },
+  {
+    "id": "python:template-mono-stack",
+    "problemId": "python:template-mono-stack",
+    "title": "Mono Stack",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "mono-stack"
+    ],
+    "sourceSlug": "mono-stack",
+    "content": "def mono_stack(insert_entries):\n    stack = []\n    for entry in insert_entries:\n        while stack and stack[-1] <= entry:\n            stack.pop()\n            # Do something with the popped item here\n        stack.append(entry)\n"
+  },
+  {
+    "id": "python:template-prefix-sum",
+    "problemId": "python:template-prefix-sum",
+    "title": "Prefix Sum",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "prefix-sum"
+    ],
+    "sourceSlug": "prefix-sum",
+    "content": "def build_prefix_sum(arr):\n    n = len(arr)\n    prefix_sum = [0] * n\n    prefix_sum[0] = arr[0]\n    for i in range(1, n):\n        prefix_sum[i] = prefix_sum[i - 1] + arr[i]\n    return prefix_sum\n\n# Query sum of range [left, right] (inclusive)\ndef query_range(prefix_sum, left, right):\n    if left == 0:\n        return prefix_sum[right]\n    return prefix_sum[right] - prefix_sum[left - 1]\n"
+  },
+  {
+    "id": "python:template-sliding-window-fixed",
+    "problemId": "python:template-sliding-window-fixed",
+    "title": "Sliding Window (Fixed Size)",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "sliding-window-fixed"
+    ],
+    "sourceSlug": "sliding-window-fixed",
+    "content": "def sliding_window_fixed(input, window_size):\n    ans = window = input[0:window_size]\n    for right in range(window_size, len(input)):\n        left = right - window_size\n        remove input[left] from window\n        append input[right] to window\n        ans = optimal(ans, window)\n    return ans\n"
+  },
+  {
+    "id": "python:template-sliding-window-flexible",
+    "problemId": "python:template-sliding-window-flexible",
+    "title": "Sliding Window (Flexible Longest)",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "sliding-window-flexible"
+    ],
+    "sourceSlug": "sliding-window-flexible",
+    "content": "def sliding_window_flexible_longest(input):\n    initialize window, ans\n    left = 0\n    for right in range(len(input)):\n        append input[right] to window\n        while invalid(window):  # update left until window is valid again\n            remove input[left] from window\n            left += 1\n        ans = max(ans, window)  # window is guaranteed to be valid here\n    return ans\n"
+  },
+  {
+    "id": "python:template-topological-sort",
+    "problemId": "python:template-topological-sort",
+    "title": "Topological Sort",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "topological-sort"
+    ],
+    "sourceSlug": "topological-sort",
+    "content": "from collections import deque\n\ndef find_indegree(graph):\n    indegree = {node: 0 for node in graph}\n    for node in graph:\n        for neighbor in graph[node]:\n            indegree[neighbor] += 1\n    return indegree\n\ndef topo_sort(graph):\n    res = []\n    q = deque()\n    indegree = find_indegree(graph)\n    for node in indegree:\n        if indegree[node] == 0:\n            q.append(node)\n    while len(q) > 0:\n        node = q.popleft()\n        res.append(node)\n        for neighbor in graph[node]:\n            indegree[neighbor] -= 1\n            if indegree[neighbor] == 0:\n                q.append(neighbor)\n    return res if len(graph) == len(res) else None\n"
+  },
+  {
+    "id": "python:template-trie",
+    "problemId": "python:template-trie",
+    "title": "Trie",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "trie"
+    ],
+    "sourceSlug": "trie",
+    "content": "class Node:\n    def __init__(self, value):\n        self.value = value\n        self.children = {}\n\n    def insert(self, s, idx):\n        # idx: index of the current character in s\n        if idx != len(s):\n            self.children.setdefault(s[idx], Node(s[idx]))\n            self.children.get(s[idx]).insert(s, idx + 1)\n"
+  },
+  {
+    "id": "python:template-two-pointers-opposite",
+    "problemId": "python:template-two-pointers-opposite",
+    "title": "Two Pointers (Opposite Direction)",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "two-pointers-opposite"
+    ],
+    "sourceSlug": "two-pointers-opposite",
+    "content": "def two_pointers_opposite(arr):\n    left, right = 0, len(arr) - 1\n    while left < right:\n        # Process current elements\n        current = process(arr[left], arr[right])\n\n        # Update pointers based on condition\n        if condition(arr[left], arr[right]):\n            left += 1\n        else:\n            right -= 1\n"
+  },
+  {
+    "id": "python:template-two-pointers-same",
+    "problemId": "python:template-two-pointers-same",
+    "title": "Two Pointers (Same Direction)",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "two-pointers-same"
+    ],
+    "sourceSlug": "two-pointers-same",
+    "content": "def two_pointers_same(arr):\n    slow, fast = 0, 0\n    while fast < len(arr):\n        # Process current elements\n        current = process(arr[slow], arr[fast])\n\n        # Update pointers based on condition\n        if condition(arr[slow], arr[fast]):\n            slow += 1\n\n        # Fast pointer always moves forward\n        fast += 1\n"
+  },
+  {
+    "id": "python:template-union-find",
+    "problemId": "python:template-union-find",
+    "title": "Union Find",
+    "language": "python",
+    "type": "template",
+    "topics": [
+      "union-find"
+    ],
+    "sourceSlug": "union-find",
+    "content": "class UnionFind:\n    def __init__(self):\n        self.id = {}\n\n    def find(self, x):\n        y = self.id.get(x, x)\n        if y != x:\n            self.id[x] = y = self.find(y)\n        return y\n\n    def union(self, x, y):\n        self.id[self.find(x)] = self.find(y)\n"
+  }
+]

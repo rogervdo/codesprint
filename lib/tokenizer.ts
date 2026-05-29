@@ -87,8 +87,6 @@ const CPP_KEYWORDS = new Set([
 const KEYWORD_SETS: Record<SupportedLanguage, Set<string>> = {
     javascript: JS_KEYWORDS,
     python: PYTHON_KEYWORDS,
-    java: JAVA_KEYWORDS,
-    cpp: CPP_KEYWORDS,
 };
 
 // ---------------------------------------------------------------------------

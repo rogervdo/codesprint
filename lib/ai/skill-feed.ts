@@ -9,7 +9,7 @@
 import { analyzeWeakPatterns, type WeakPattern } from "@/lib/pattern-analysis";
 import { tokenize } from "@/lib/tokenizer";
 import { getWeights } from "@/lib/token-weights";
-import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
+import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
 import type { DrillRequest } from "./types";
 import type { SessionRecord } from "@/lib/storage/session-history";
 import { getSessionsAsync } from "@/lib/storage/session-history";
@@ -29,16 +29,6 @@ const LANGUAGE_DEFAULTS: Record<SupportedLanguage, WeakPattern[]> = {
         { category: "keyword", errorCount: 0, totalTokens: 0, errorRate: 1.5, label: "Keywords" },
         { category: "operator", errorCount: 0, totalTokens: 0, errorRate: 1.5, label: "Operators" },
         { category: "delimiter", errorCount: 0, totalTokens: 0, errorRate: 1.2, label: "Delimiters" },
-    ],
-    java: [
-        { category: "keyword", errorCount: 0, totalTokens: 0, errorRate: 1.5, label: "Keywords" },
-        { category: "operator", errorCount: 0, totalTokens: 0, errorRate: 1.5, label: "Operators" },
-        { category: "delimiter", errorCount: 0, totalTokens: 0, errorRate: 1.2, label: "Delimiters" },
-    ],
-    cpp: [
-        { category: "operator", errorCount: 0, totalTokens: 0, errorRate: 1.6, label: "Operators" },
-        { category: "keyword", errorCount: 0, totalTokens: 0, errorRate: 1.5, label: "Keywords" },
-        { category: "delimiter", errorCount: 0, totalTokens: 0, errorRate: 1.3, label: "Delimiters" },
     ],
 };
 
@@ -156,10 +146,6 @@ function inferLengthFromSkill(skillModel: SkillModelRecord | null): SnippetLengt
     if (skillModel.sessionCount < 5) return "short";
     if (skillModel.sessionCount < 15) return "medium";
     
-    // Based on current difficulty preference
-    if (skillModel.currentDifficulty === "easy") return "short";
-    if (skillModel.currentDifficulty === "hard") return "long";
-    
     return "medium";
 }
 
@@ -179,11 +165,9 @@ export async function buildDrillRequest(
     const sessions = await getSessionsAsync({ language, limit: 10 });
     const weakPatterns = await aggregateWeakPatternsAcrossSessions(sessions, language);
 
-    // 2. Get adaptive difficulty state
     const skillModel = await getSkillModel(language);
-    const difficulty: Difficulty = (skillModel?.currentDifficulty as Difficulty) ?? "easy";
 
-    // 3. Determine length
+    // Determine length
     const lengthCategory: SnippetLength =
         preferences.aiDrillLengthPreference === "auto" || !preferences.aiDrillLengthPreference
             ? inferLengthFromSkill(skillModel)
@@ -194,7 +178,7 @@ export async function buildDrillRequest(
 
     return {
         language,
-        difficulty,
+        contentType: "template",
         lengthCategory,
         weakPatterns,
         targetTokenCategories: weakPatterns.map((w) => w.category).slice(0, 3),

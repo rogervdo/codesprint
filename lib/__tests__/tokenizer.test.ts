@@ -104,41 +104,6 @@ describe("tokenize", () => {
         });
     });
 
-    describe("Java", () => {
-        it("tokenizes Java keywords", () => {
-            const tokens = tokenize("public class Foo {}", "java");
-            expect(tokens[0]).toMatchObject({ category: "keyword", text: "public" });
-            const cls = tokens.find((t) => t.text === "class");
-            expect(cls?.category).toBe("keyword");
-        });
-
-        it("tokenizes annotations as operators", () => {
-            const tokens = tokenize("@Override\npublic void foo() {}", "java");
-            const at = tokens.find((t) => t.text === "@");
-            expect(at?.category).toBe("operator");
-        });
-    });
-
-    describe("C++", () => {
-        it("tokenizes C++ keywords", () => {
-            const tokens = tokenize("template <typename T>", "cpp");
-            expect(tokens[0]).toMatchObject({ category: "keyword", text: "template" });
-            const tn = tokens.find((t) => t.text === "typename");
-            expect(tn?.category).toBe("keyword");
-        });
-
-        it("tokenizes std as keyword", () => {
-            const tokens = tokenize("std::vector<int> v;", "cpp");
-            const std = tokens.find((t) => t.text === "std");
-            expect(std?.category).toBe("keyword");
-        });
-
-        it("handles scope operator", () => {
-            const tokens = tokenize("std::cout", "cpp");
-            const colons = tokens.filter((t) => t.category === "delimiter" && t.text === ":");
-            expect(colons.length).toBe(2);
-        });
-    });
 });
 
 describe("buildCategoryMap", () => {

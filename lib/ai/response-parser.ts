@@ -118,25 +118,6 @@ function validateImports(content: string, language: SupportedLanguage): Validati
                     violations.push(moduleName);
                 }
             }
-        } else if (language === "java") {
-            const match = trimmed.match(/^import\s+([\w.]+)/);
-            if (match) {
-                const pkg = match[1];
-                if (!allowlist.some((a) => pkg.startsWith(a))) {
-                    violations.push(pkg);
-                }
-            }
-        } else if (language === "cpp") {
-            const match = trimmed.match(/^#include\s*<(\w+)>/);
-            if (match) {
-                if (!allowlist.includes(match[1])) {
-                    violations.push(match[1]);
-                }
-            }
-            // Reject #include "..." (local headers)
-            if (trimmed.match(/^#include\s*"/)) {
-                violations.push(trimmed);
-            }
         } else if (language === "javascript") {
             // Reject all import/require statements
             if (trimmed.match(/^import\s/) || trimmed.match(/require\(/)) {

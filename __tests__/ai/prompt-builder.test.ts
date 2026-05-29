@@ -9,7 +9,7 @@ import type { DrillRequest } from "@/lib/ai/types";
 function makeRequest(overrides: Partial<DrillRequest> = {}): DrillRequest {
     return {
         language: "python",
-        difficulty: "medium",
+        contentType: "template",
         lengthCategory: "medium",
         weakPatterns: [],
         targetTokenCategories: [],
@@ -33,19 +33,6 @@ describe("getStdlibAllowlist", () => {
         expect(list.length).toBeGreaterThan(0);
         expect(list).toContain("collections");
         expect(list).toContain("itertools");
-    });
-
-    it("returns a non-empty list for java", () => {
-        const list = getStdlibAllowlist("java");
-        expect(list.length).toBeGreaterThan(0);
-        expect(list).toContain("java.util");
-    });
-
-    it("returns a non-empty list for cpp", () => {
-        const list = getStdlibAllowlist("cpp");
-        expect(list.length).toBeGreaterThan(0);
-        expect(list).toContain("vector");
-        expect(list).toContain("string");
     });
 
     it("returns an empty list for javascript", () => {
@@ -80,27 +67,6 @@ describe("isImportAllowed", () => {
         expect(isImportAllowed("python", "requests")).toBe(false);
     });
 
-    it("allows java.util and sub-packages for java", () => {
-        expect(isImportAllowed("java", "java.util")).toBe(true);
-        expect(isImportAllowed("java", "java.util.List")).toBe(true);
-        expect(isImportAllowed("java", "java.util.stream.Collectors")).toBe(true);
-    });
-
-    it("rejects non-allowed java packages", () => {
-        expect(isImportAllowed("java", "javax.servlet")).toBe(false);
-        expect(isImportAllowed("java", "com.google.gson")).toBe(false);
-    });
-
-    it("allows stdlib headers for cpp", () => {
-        expect(isImportAllowed("cpp", "vector")).toBe(true);
-        expect(isImportAllowed("cpp", "algorithm")).toBe(true);
-    });
-
-    it("rejects non-stdlib headers for cpp", () => {
-        expect(isImportAllowed("cpp", "boost")).toBe(false);
-        expect(isImportAllowed("cpp", "pthread")).toBe(false);
-    });
-
     it("rejects all imports for javascript", () => {
         expect(isImportAllowed("javascript", "fs")).toBe(false);
         expect(isImportAllowed("javascript", "lodash")).toBe(false);
@@ -122,8 +88,8 @@ describe("buildPrompt", () => {
     });
 
     it("includes the language in the system prompt", () => {
-        const result = buildPrompt(makeRequest({ language: "java" }));
-        expect(result.systemPrompt).toContain("java");
+        const result = buildPrompt(makeRequest({ language: "javascript" }));
+        expect(result.systemPrompt).toContain("javascript");
     });
 
     it("includes stdlib allowlist info for python", () => {
@@ -158,9 +124,9 @@ describe("buildPrompt", () => {
         expect(result.userPrompt).toContain("31-60");
     });
 
-    it("includes difficulty in user prompt", () => {
-        const result = buildPrompt(makeRequest({ difficulty: "hard" }));
-        expect(result.userPrompt).toContain("hard");
+    it("includes content type in user prompt", () => {
+        const result = buildPrompt(makeRequest({ contentType: "problem" }));
+        expect(result.userPrompt).toContain("problems");
     });
 
     it("includes target token categories in system prompt", () => {

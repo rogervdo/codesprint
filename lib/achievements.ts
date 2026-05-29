@@ -1,6 +1,7 @@
 import type { StreakState } from "./streaks";
 import type { SessionRecord } from "./storage/session-history";
-import type { SupportedLanguage, SnippetLength, Difficulty } from "./snippets";
+import type { SupportedLanguage, SnippetLength } from "./snippets";
+import type { SnippetType } from "./catalog";
 import type { HistoryEntry } from "@/hooks/useTypingEngine";
 
 export type AchievementRarity = "common" | "rare" | "epic" | "legendary";
@@ -21,7 +22,7 @@ export type AchievementContext = {
     accuracy: number;
     elapsedMs: number;
     language: SupportedLanguage;
-    difficulty: Difficulty;
+    contentType: SnippetType;
     lengthCategory: SnippetLength;
     errorCount: number;
     totalKeystrokes: number;
@@ -103,7 +104,7 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
     rarity: "rare",
     icon: "🤠",
     predicate: (ctx) =>
-      ctx.session.wpm > 80 && ctx.session.difficulty === "hard",
+      ctx.session.wpm > 80 && ctx.session.contentType === "problem",
   },
   {
     id: "blitz",
@@ -388,11 +389,11 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: "hard-mode",
     name: "Hard Mode",
-    description: "Complete a hard difficulty snippet",
+    description: "Complete a problem snippet",
     category: "challenge",
     rarity: "common",
     icon: "💀",
-    predicate: (ctx) => ctx.session.difficulty === "hard",
+    predicate: (ctx) => ctx.session.contentType === "problem",
   },
   {
     id: "long-haul",
@@ -424,12 +425,12 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
   {
     id: "speed-on-hard",
     name: "Speed on Hard",
-    description: "Score over 80 WPM on a hard difficulty snippet",
+    description: "Score over 80 WPM on a problem snippet",
     category: "challenge",
     rarity: "epic",
     icon: "🏎️",
     predicate: (ctx) =>
-      ctx.session.wpm > 80 && ctx.session.difficulty === "hard",
+      ctx.session.wpm > 80 && ctx.session.contentType === "problem",
   },
 
   // ── Special (2) ────────────────────────────────────────────
@@ -446,14 +447,14 @@ export const ACHIEVEMENTS: readonly AchievementDefinition[] = [
     id: "legendary",
     name: "Legendary",
     description:
-      "Achieve 150+ WPM with 100% accuracy on a hard difficulty snippet",
+      "Achieve 150+ WPM with 100% accuracy on a problem snippet",
     category: "special",
     rarity: "legendary",
     icon: "👑",
     predicate: (ctx) =>
       ctx.session.wpm > 150 &&
       ctx.session.accuracy === 1 &&
-      ctx.session.difficulty === "hard",
+      ctx.session.contentType === "problem",
   },
 ] as const;
 

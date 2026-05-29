@@ -1,4 +1,5 @@
-import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
+import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 import type { HistoryEntry, ErrorEntry } from "@/hooks/useTypingEngine";
 import { idbGetAll, idbGet, idbPut, idbDelete, idbClear, isIdbAvailable, STORES } from "./idb-store";
 
@@ -8,7 +9,9 @@ export type SessionRecord = {
     snippetId: string;
     language: SupportedLanguage;
     lengthCategory: SnippetLength;
-    difficulty: Difficulty;
+    contentType: SnippetType;
+    /** @deprecated Legacy field from before content-type taxonomy */
+    difficulty?: string;
     wpm: number;
     rawWpm: number;
     accuracy: number;
@@ -30,7 +33,7 @@ export type CreateSessionInput = Omit<SessionRecord, "id" | "date">;
 export type SessionFilters = {
     language?: SupportedLanguage;
     lengthCategory?: SnippetLength;
-    difficulty?: Difficulty;
+    contentType?: SnippetType;
     snippetId?: string;
     limit?: number;
     offset?: number;
@@ -331,8 +334,8 @@ function applyFilters(records: SessionRecord[], filters?: SessionFilters): Sessi
     if (filters?.lengthCategory) {
         result = result.filter((r) => r.lengthCategory === filters.lengthCategory);
     }
-    if (filters?.difficulty) {
-        result = result.filter((r) => r.difficulty === filters.difficulty);
+    if (filters?.contentType) {
+        result = result.filter((r) => r.contentType === filters.contentType);
     }
     if (filters?.snippetId) {
         result = result.filter((r) => r.snippetId === filters.snippetId);

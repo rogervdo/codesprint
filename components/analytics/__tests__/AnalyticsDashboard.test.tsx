@@ -12,8 +12,6 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
     javascript: "JavaScript",
     python: "Python",
-    java: "Java",
-    cpp: "C++",
 };
 
 function formatDuration(ms: number): string {
@@ -52,8 +50,6 @@ describe("AnalyticsDashboard utilities", () => {
         it("should map all supported languages to display names", () => {
             expect(LANGUAGE_LABELS.javascript).toBe("JavaScript");
             expect(LANGUAGE_LABELS.python).toBe("Python");
-            expect(LANGUAGE_LABELS.java).toBe("Java");
-            expect(LANGUAGE_LABELS.cpp).toBe("C++");
         });
     });
 
@@ -241,10 +237,9 @@ describe("AnalyticsDashboard data types", () => {
                 totalTimeMs: 750000,
                 bestWpm: 95,
                 worstWpm: 40,
-                byDifficulty: {
-                    easy: { wpm: 75, accuracy: 0.95, sessions: 10 },
-                    medium: { wpm: 65, accuracy: 0.92, sessions: 10 },
-                    hard: { wpm: 55, accuracy: 0.88, sessions: 5 },
+                byContentType: {
+                    template: { wpm: 75, accuracy: 0.95, sessions: 10 },
+                    problem: { wpm: 55, accuracy: 0.88, sessions: 5 },
                 },
                 byLength: {
                     short: { wpm: 80, accuracy: 0.96, sessions: 8 },
@@ -255,7 +250,7 @@ describe("AnalyticsDashboard data types", () => {
             };
 
             expect(averages.totalSessions).toBe(25);
-            expect(averages.byDifficulty.easy.sessions).toBe(10);
+            expect(averages.byContentType.template.sessions).toBe(10);
             expect(averages.byLength.short.wpm).toBe(80);
         });
 
@@ -267,10 +262,9 @@ describe("AnalyticsDashboard data types", () => {
                 totalTimeMs: 150000,
                 bestWpm: 70,
                 worstWpm: 50,
-                byDifficulty: {
-                    easy: { wpm: 60, accuracy: 0.9, sessions: 5 },
-                    medium: { wpm: 0, accuracy: 0, sessions: 0 },
-                    hard: { wpm: 0, accuracy: 0, sessions: 0 },
+                byContentType: {
+                    template: { wpm: 60, accuracy: 0.9, sessions: 5 },
+                    problem: { wpm: 0, accuracy: 0, sessions: 0 },
                 },
                 byLength: {
                     short: { wpm: 60, accuracy: 0.9, sessions: 5 },
@@ -280,7 +274,7 @@ describe("AnalyticsDashboard data types", () => {
                 improvementRate: 0,
             };
 
-            expect(averages.byDifficulty.medium.sessions).toBe(0);
+            expect(averages.byContentType.problem.sessions).toBe(0);
             expect(averages.byLength.long.sessions).toBe(0);
         });
 

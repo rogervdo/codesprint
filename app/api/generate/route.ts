@@ -13,8 +13,8 @@ import type { DrillRequest, GenerateApiResponse, GenerateApiError } from "@/lib/
 import { detectProviderFromKey } from "@/lib/ai/key-storage";
 
 const drillRequestSchema = z.object({
-    language: z.enum(["javascript", "python", "java", "cpp"]),
-    difficulty: z.enum(["easy", "medium", "hard"]),
+    language: z.enum(["javascript", "python"]),
+    contentType: z.enum(["template", "problem"]).optional(),
     lengthCategory: z.enum(["short", "medium", "long"]),
     weakPatterns: z.array(z.object({
         category: z.enum(["keyword", "operator", "delimiter", "identifier", "literal", "string", "comment", "whitespace"]),

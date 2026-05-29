@@ -8,7 +8,7 @@ import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
 import type { ErrorEntry, HistoryEntry } from "@/hooks/useTypingEngine";
 import type { Token } from "@/lib/tokenizer";
 import type { AchievementDefinition } from "@/lib/achievements";
-import type { Difficulty } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 
 export interface ResultScreenProps {
     /** Adjusted WPM score */
@@ -27,8 +27,8 @@ export interface ResultScreenProps {
     snippetId: string;
     /** Programming language */
     language: SupportedLanguage;
-    /** Snippet difficulty */
-    difficulty: string;
+    /** Snippet content type */
+    contentType: SnippetType;
     /** Snippet length category */
     lengthCategory: SnippetLength;
     /** Error log for analysis */
@@ -53,8 +53,6 @@ export interface ResultScreenProps {
     xpGained?: number;
     /** Achievements unlocked this session */
     newlyUnlocked?: AchievementDefinition[];
-    /** Difficulty transition suggestion */
-    difficultyTransition?: { newDifficulty: Difficulty; reason: string };
     /** Whether the snippet was AI-generated */
     isAIDrill?: boolean;
 }
@@ -72,7 +70,7 @@ export function ResultScreen({
     snippetTitle,
     snippetId,
     language,
-    difficulty,
+    contentType,
     lengthCategory,
     errorLog,
     history,
@@ -85,7 +83,6 @@ export function ResultScreen({
     contentLength,
     xpGained,
     newlyUnlocked,
-    difficultyTransition,
     isAIDrill,
 }: ResultScreenProps) {
     const resultCardMotion = getResultCardMotion(prefersReducedMotion);
@@ -113,7 +110,7 @@ export function ResultScreen({
                     snippetTitle={snippetTitle}
                     snippetId={snippetId}
                     language={language}
-                    difficulty={difficulty}
+                    contentType={contentType}
                     lengthCategory={lengthCategory}
                     errorLog={errorLog}
                     history={history}
@@ -149,11 +146,6 @@ export function ResultScreen({
                     </Flex>
                 )}
 
-                {difficultyTransition && difficultyTransition.reason !== "unchanged" && (
-                    <Text fontSize="sm" color="var(--text-subtle)">
-                        Difficulty adjusted to <Text as="span" fontWeight={600} color="var(--accent)">{difficultyTransition.newDifficulty}</Text>
-                    </Text>
-                )}
             </Stack>
         </motion.div>
     );

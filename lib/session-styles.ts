@@ -134,6 +134,45 @@ export function getNextProblemButtonStyles(isTerminalMode: boolean): Partial<But
 }
 
 /**
+ * Icon button beside "Next problem" for random selection
+ */
+export function getRandomizeButtonStyles(isTerminalMode: boolean): Partial<ButtonProps> {
+    const { surface, surfaceHover, surfaceActive, border, borderStrong, textSubtle, accent } =
+        SESSION_CSS_VARS;
+
+    if (isTerminalMode) {
+        return {
+            size: "sm",
+            borderRadius: "8px",
+            minW: "2.25rem",
+            h: "2.25rem",
+            p: 0,
+            fontFamily: MONO_FONT_STACK,
+            bg: surface,
+            color: accent,
+            border: "1px solid",
+            borderColor: borderStrong,
+            _hover: { bg: surfaceHover },
+            _active: { bg: surfaceActive },
+        };
+    }
+
+    return {
+        size: "sm",
+        borderRadius: "full",
+        minW: "2.25rem",
+        h: "2.25rem",
+        p: 0,
+        bg: surface,
+        color: textSubtle,
+        border: "1px solid",
+        borderColor: border,
+        _hover: { bg: surfaceHover, color: accent, borderColor: borderStrong },
+        _active: { bg: surfaceActive },
+    };
+}
+
+/**
  * Calculate layout gap based on interface mode
  */
 export function getLayoutGap(isTerminalMode: boolean, isImmersive: boolean): number {

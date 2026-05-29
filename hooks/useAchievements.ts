@@ -17,7 +17,8 @@ import {
     STORES,
 } from "@/lib/storage/idb-store";
 import type { AchievementRecord } from "@/lib/storage/idb-store";
-import type { Difficulty, SnippetLength } from "@/lib/snippets";
+import type { SnippetLength } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 
 export interface UseAchievementsProps {
     phase: "idle" | "countdown" | "running" | "finished";
@@ -27,7 +28,7 @@ export interface UseAchievementsProps {
         accuracy: number;
         elapsedMs: number;
         language: string;
-        difficulty: string;
+        contentType: SnippetType;
         lengthCategory: string;
         errorCount: number;
         totalKeystrokes: number;
@@ -78,7 +79,7 @@ export function useAchievements({
     const sessionAccuracy = session.accuracy;
     const sessionElapsedMs = session.elapsedMs;
     const sessionLanguage = session.language;
-    const sessionDifficulty = session.difficulty;
+    const sessionContentType = session.contentType;
     const sessionLengthCategory = session.lengthCategory;
     const sessionErrorCount = session.errorCount;
     const sessionTotalKeystrokes = session.totalKeystrokes;
@@ -123,7 +124,7 @@ export function useAchievements({
                 const xpResult = computeSessionXp({
                     wpm: sessionWpm,
                     accuracy: sessionAccuracy,
-                    difficulty: sessionDifficulty as Difficulty,
+                    contentType: sessionContentType,
                     lengthCategory: sessionLengthCategory as SnippetLength,
                 });
                 const prevXp = storedTotalXp ?? 0;
@@ -187,7 +188,7 @@ export function useAchievements({
                         accuracy: sessionAccuracy,
                         elapsedMs: sessionElapsedMs,
                         language: sessionLanguage as AchievementContext["session"]["language"],
-                        difficulty: sessionDifficulty as Difficulty,
+                        contentType: sessionContentType,
                         lengthCategory: sessionLengthCategory as SnippetLength,
                         errorCount: sessionErrorCount,
                         totalKeystrokes: sessionTotalKeystrokes,
@@ -245,7 +246,7 @@ export function useAchievements({
     }, [
         phase,
         sessionSnippetId, sessionWpm, sessionAccuracy, sessionElapsedMs,
-        sessionLanguage, sessionDifficulty, sessionLengthCategory,
+        sessionLanguage, sessionContentType, sessionLengthCategory,
         sessionErrorCount, sessionTotalKeystrokes, sessionCorrectKeystrokes,
         sessionPatternScore, sessionHistory, prefVimMode, prefTheme,
     ]);

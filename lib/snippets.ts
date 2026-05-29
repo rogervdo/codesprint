@@ -1,19 +1,21 @@
 "use client";
 
-// import leetcodeDataset from "@/data/leetcode-snippets.json";
-
+import type { CatalogTopic, SnippetType } from "@/lib/catalog";
+import { isSnippetType, isTopicForType } from "@/lib/catalog";
 import type { Token } from "./tokenizer";
 
-export type SupportedLanguage = "javascript" | "python" | "java" | "cpp";
+export type SupportedLanguage = "javascript" | "python";
 export type SnippetLength = "short" | "medium" | "long";
-export type Difficulty = "easy" | "medium" | "hard";
+
+export type { CatalogTopic, SnippetType };
 
 export type Problem = {
     id: string;
     title: string;
     summary: string;
     language: SupportedLanguage;
-    availableLengths: SnippetLength[];
+    types: SnippetType[];
+    topics: CatalogTopic[];
 };
 
 export type Snippet = {
@@ -22,45 +24,30 @@ export type Snippet = {
     title: string;
     content: string;
     language: SupportedLanguage;
+    type: SnippetType;
+    topics: CatalogTopic[];
     lengthCategory: SnippetLength;
-    difficulty: Difficulty;
     lines: number;
     sourceSlug?: string;
-    frontendId?: number;
     tokens?: Token[];
 };
 
-type ProblemFilters = {
-    length?: SnippetLength;
+export type ContentFilters = {
+    types: SnippetType[];
+    topics: CatalogTopic[];
 };
 
-type SnippetFilters = {
-    length?: SnippetLength;
-};
+export type SnippetVarianceTag = "signature-only" | "full";
 
-export type SnippetVarianceTag = "python-pandas-signature" | "signature-only" | "full";
-
-type DatasetSnippet = {
+type CatalogEntry = {
     id?: string;
-    lang?: string;
-    difficulty?: string;
     title?: string;
     content?: string;
-    lines?: number;
-    lengthCategory?: string;
+    language?: string;
+    type?: string;
+    topics?: unknown;
     problemId?: string;
-    frontendId?: number;
     sourceSlug?: string;
-};
-
-type SnippetDefinition = {
-    id: string;
-    language: SupportedLanguage;
-    difficulty: Difficulty;
-    title: string;
-    content: string;
-    sourceSlug?: string;
-    lengthCategory?: SnippetLength;
 };
 
 const LENGTH_THRESHOLDS = {
@@ -68,526 +55,47 @@ const LENGTH_THRESHOLDS = {
     medium: 30,
 } as const;
 
-const LENGTH_ORDER: Record<SnippetLength, number> = {
-    short: 0,
-    medium: 1,
-    long: 2,
+/** Shown when no catalog entries match the current filters. */
+export const PLACEHOLDER_SNIPPET: Snippet = {
+    id: "placeholder-empty",
+    problemId: "placeholder:empty",
+    title: "No snippets yet",
+    content: `// Add templates and problems to data/snippets-catalog.json
+// Then restart the dev server.
+`,
+    language: "python",
+    type: "template",
+    topics: ["backtracking-basic"],
+    lengthCategory: "short",
+    lines: 3,
 };
 
-const PYTHON_PANDAS_SIGNATURE_PATTERN = /^import pandas as pd\s*\n\s*def [a-zA-Z_]\w*\([^)]*\)\s*->\s*pd\.DataFrame:\s*\n$/;
-
-function isSkeletal(content: string, language: SupportedLanguage): boolean {
-    const lines = content.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-    let substantiveLines = 0;
-
-    if (language === "javascript") {
-        for (const line of lines) {
-            if (
-                !line.match(/^var .* = function\s*\(.*\)\s*{\s*$/) &&
-                !line.match(/.*\.prototype\..* = function\s*\(.*\)\s*{\s*$/) &&
-                !line.match(/^class /) &&
-                !line.match(/^constructor/) &&
-                !line.match(/^[}\]];?$/)
-            ) {
-                substantiveLines++;
-            }
-        }
-    } else if (language === "python") {
-        for (const line of lines) {
-            if (
-                !line.match(/^def .*:$/) &&
-                !line.match(/^class /) &&
-                !line.match(/^@/) &&
-                !line.match(/^pass$/)
-            ) {
-                substantiveLines++;
-            }
-        }
-    } else {
-        // Default to keeping it if we don't know the language well enough
-        return false;
-    }
-
-    return substantiveLines < 1;
-}
-
-const CURATED_SNIPPETS: Snippet[] = [
-    defineSnippet({
-        id: "py-area-short",
-        language: "python",
-        difficulty: "easy",
-        title: "Area of Circle",
-        sourceSlug: "py-area",
-        lengthCategory: "short",
-        content: `import math
-
-def area(radius):
-    return math.pi * radius * radius`,
-    }),
-    defineSnippet({
-        id: "js-array-dedupe-short",
-        language: "javascript",
-        difficulty: "easy",
-        title: "Array helper utilities",
-        sourceSlug: "js-array-helpers",
-        lengthCategory: "short",
-        content: `export function unique<T>(values: T[]): T[] {
-    const seen = new Set<T>();
-    const output: T[] = [];
-    for (const value of values) {
-        if (!seen.has(value)) {
-            seen.add(value);
-            output.push(value);
-        }
-    }
-    return output;
-}
-
-export function chunk<T>(values: T[], size: number): T[][] {
-    if (size <= 0) return [values];
-    const result: T[][] = [];
-    for (let index = 0; index < values.length; index += size) {
-        result.push(values.slice(index, index + size));
-    }
-    return result;
-}`,
-    }),
-    defineSnippet({
-        id: "js-array-dedupe-medium",
-        language: "javascript",
-        difficulty: "medium",
-        title: "Array helper utilities (extended)",
-        sourceSlug: "js-array-helpers",
-        lengthCategory: "medium",
-        content: `type Comparator<T> = (a: T, b: T) => number;
-
-export function sortBy<T>(values: T[], iteratee: (item: T) => string | number, comparator?: Comparator<T>): T[] {
-    const derived = values.map((value) => ({ value, key: iteratee(value) }));
-    const cmp: Comparator<typeof derived[number]> =
-        comparator ?? ((a, b) => (a.key > b.key ? 1 : a.key < b.key ? -1 : 0));
-    return derived.sort(cmp).map((item) => item.value);
-}
-
-export function groupBy<T>(values: T[], iteratee: (item: T) => string): Record<string, T[]> {
-    return values.reduce<Record<string, T[]>>((acc, value) => {
-        const key = iteratee(value);
-        acc[key] ??= [];
-        acc[key].push(value);
-        return acc;
-    }, {});
-}`,
-    }),
-    defineSnippet({
-        id: "py-stream-reader-short",
-        language: "python",
-        difficulty: "easy",
-        title: "Stream reader",
-        sourceSlug: "py-stream-reader",
-        lengthCategory: "short",
-        content: `from collections import deque
-from typing import Iterable, Iterator, TypeVar
-
-T = TypeVar("T")
-
-class Window(Iterator[T]):
-    def __init__(self, source: Iterable[T], size: int) -> None:
-        self._source = iter(source)
-        self._size = max(1, size)
-        self._buffer: deque[T] = deque()
-
-    def __iter__(self) -> "Window[T]":
-        return self
-
-    def __next__(self) -> list[T]:
-        while len(self._buffer) < self._size:
-            self._buffer.append(next(self._source))
-        item = list(self._buffer)
-        self._buffer.popleft()
-        return item`,
-    }),
-    defineSnippet({
-        id: "py-stream-reader-medium",
-        language: "python",
-        difficulty: "medium",
-        title: "Stream reader (batched)",
-        sourceSlug: "py-stream-reader",
-        lengthCategory: "medium",
-        content: `from typing import Iterable, Iterator, TypeVar, Generic
-
-T = TypeVar("T")
-
-class Batch(Generic[T]):
-    def __init__(self, source: Iterable[T], size: int) -> None:
-        self._source = iter(source)
-        self._size = max(1, size)
-
-    def __iter__(self) -> Iterator[list[T]]:
-        batch = []
-        for item in self._source:
-            batch.append(item)
-            if len(batch) == self._size:
-                yield batch
-                batch = []
-        if batch:
-            yield batch`,
-    }),
-    defineSnippet({
-        id: "py-interval-index-short",
-        language: "python",
-        difficulty: "easy",
-        title: "Interval index",
-        sourceSlug: "py-interval-index",
-        lengthCategory: "short",
-        content: `from bisect import bisect_left
-
-def find_slot(bounds: list[int], value: int) -> int:
-    if not bounds:
-        return 0
-    index = bisect_left(bounds, value)
-    return max(0, min(index, len(bounds) - 1))`,
-    }),
-    defineSnippet({
-        id: "py-interval-index-medium",
-        language: "python",
-        difficulty: "medium",
-        title: "Interval index (with cache)",
-        sourceSlug: "py-interval-index",
-        lengthCategory: "medium",
-        content: `from bisect import bisect_left
-from dataclasses import dataclass, field
-
-@dataclass
-class IntervalIndex:
-    bounds: list[int]
-    _cache: dict[int, int] = field(default_factory=dict)
-
-    def locate(self, value: int) -> int:
-        if value in self._cache:
-            return self._cache[value]
-        idx = bisect_left(self.bounds, value)
-        idx = max(0, min(idx, len(self.bounds) - 1))
-        self._cache[value] = idx
-        return idx`,
-    }),
-    defineSnippet({
-        id: "java-logger-short",
-        language: "java",
-        difficulty: "easy",
-        title: "Structured logger",
-        sourceSlug: "java-logger",
-        lengthCategory: "short",
-        content: `package dev.codesprint.logging;
-
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-
-public final class StructuredLogger {
-    private final Map<String, Object> context = new HashMap<>();
-
-    public StructuredLogger with(String key, Object value) {
-        context.put(key, value);
-        return this;
-    }
-
-    public void info(String message) {
-        emit("info", message);
-    }
-
-    public void error(String message) {
-        emit("error", message);
-    }
-
-    private void emit(String severity, String message) {
-        Map<String, Object> payload = new HashMap<>(context);
-        payload.put("ts", Instant.now().toString());
-        payload.put("severity", severity);
-        payload.put("message", message);
-        System.out.println(payload);
-    }
-}`,
-    }),
-    defineSnippet({
-        id: "java-logger-medium",
-        language: "java",
-        difficulty: "hard",
-        title: "Structured logger (async)",
-        sourceSlug: "java-logger",
-        lengthCategory: "medium",
-        content: `package dev.codesprint.logging;
-
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
-public final class AsyncLogger extends StructuredLogger implements AutoCloseable {
-    private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>();
-    private final Thread worker;
-    private volatile boolean running = true;
-
-    public AsyncLogger() {
-        worker = new Thread(() -> {
-            while (running || !queue.isEmpty()) {
-                try {
-                    queue.take().run();
-                } catch (InterruptedException ignored) {
-                }
-            }
-        });
-        worker.start();
-    }
-
-    @Override
-    public void info(String message) {
-        queue.offer(() -> super.info(message));
-    }
-
-    @Override
-    public void error(String message) {
-        queue.offer(() -> super.error(message));
-    }
-
-    @Override
-    public void close() {
-        running = false;
-        worker.interrupt();
-    }
-}`,
-    }),
-    defineSnippet({
-        id: "js-document-buffer-long",
-        language: "javascript",
-        difficulty: "medium",
-        title: "Collaborative document buffer",
-        sourceSlug: "js-document-buffer",
-        lengthCategory: "long",
-        content: `type Listener = (text: string) => void;
-
-export class DocumentBuffer {
-    private lines: string[];
-    private listeners = new Set<Listener>();
-
-    constructor(text = "") {
-        this.lines = text.split("\\n");
-    }
-
-    replace(range: { line: number; column: number; deleteCount: number; insert?: string }): string {
-        const { line, column, deleteCount, insert = "" } = range;
-        const current = this.lines[line] ?? "";
-        const before = current.slice(0, column);
-        const after = current.slice(column + deleteCount);
-        this.lines[line] = before + insert + after;
-        if (insert.includes("\\n")) {
-            const [head, ...tail] = this.lines[line].split("\\n");
-            this.lines.splice(line, 1, head, ...tail);
-        }
-        this.notify();
-        return this.toString();
-    }
-
-    read(start = 0, end = this.lines.length): string {
-        return this.lines.slice(start, end).join("\\n");
-    }
-
-    onChange(listener: Listener): () => void {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-    }
-
-    private notify() {
-        const snapshot = this.toString();
-        for (const listener of this.listeners) {
-            listener(snapshot);
-        }
-    }
-
-    toString(): string {
-        return this.lines.join("\\n");
-    }
-}`,
-    }),
-    defineSnippet({
-        id: "py-stream-reader-long",
-        language: "python",
-        difficulty: "hard",
-        title: "Rolling statistics window",
-        sourceSlug: "py-stream-reader",
-        lengthCategory: "long",
-        content: `from collections import deque
-from dataclasses import dataclass, field
-from statistics import mean
-from typing import Deque, Iterable
-
-
-@dataclass
-class RollingStats:
-    window: int
-    _values: Deque[float] = field(default_factory=deque)
-    _sum: float = 0.0
-    _min: float | None = None
-    _max: float | None = None
-
-    def push(self, value: float) -> None:
-        value = float(value)
-        self._values.append(value)
-        self._sum += value
-        self._min = value if self._min is None else min(self._min, value)
-        self._max = value if self._max is None else max(self._max, value)
-        if len(self._values) > max(1, self.window):
-            removed = self._values.popleft()
-            self._sum -= removed
-            if removed == self._min or removed == self._max:
-                snapshot = list(self._values)
-                self._min = min(snapshot, default=None)
-                self._max = max(snapshot, default=None)
-
-    def extend(self, values: Iterable[float]) -> None:
-        for value in values:
-            self.push(value)
-
-    def average(self) -> float:
-        if not self._values:
-            raise RuntimeError("no samples available")
-        return self._sum / len(self._values)
-
-    def center(self) -> float:
-        if not self._values:
-            raise RuntimeError("no samples available")
-        return mean(self._values)
-
-    def bounds(self) -> tuple[float | None, float | None]:
-        return self._min, self._max
-
-    def snapshot(self) -> list[float]:
-        return list(self._values)`,
-    }),
-    defineSnippet({
-        id: "java-logger-long",
-        language: "java",
-        difficulty: "medium",
-        title: "Token bucket rate limiter",
-        sourceSlug: "java-logger",
-        lengthCategory: "long",
-        content: `package dev.codesprint.logging;
-
-import java.time.Duration;
-import java.util.Objects;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-public final class TokenBucket implements AutoCloseable {
-    private final int capacity;
-    private final AtomicInteger tokens = new AtomicInteger();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
-    public TokenBucket(int capacity, Duration refillEvery) {
-        this.capacity = Math.max(1, capacity);
-        Objects.requireNonNull(refillEvery, "refillEvery");
-        tokens.set(this.capacity);
-        long period = Math.max(1L, refillEvery.toMillis());
-        scheduler.scheduleAtFixedRate(() -> add(this.capacity / 2), period, period, TimeUnit.MILLISECONDS);
-    }
-
-    public boolean tryConsume(int amount) {
-        if (amount <= 0) return true;
-        while (true) {
-            int available = tokens.get();
-            if (available < amount) return false;
-            if (tokens.compareAndSet(available, available - amount)) return true;
-        }
-    }
-
-    public int available() {
-        return tokens.get();
-    }
-
-    private void add(int amount) {
-        if (amount <= 0) return;
-        tokens.getAndUpdate(existing -> Math.min(capacity, existing + amount));
-    }
-
-    @Override
-    public void close() {
-        scheduler.shutdownNow();
-    }
-}`,
-    }),
-    defineSnippet({
-        id: "cpp-ring-buffer",
-        language: "cpp",
-        difficulty: "medium",
-        title: "Fixed-size ring buffer",
-        sourceSlug: "cpp-ring-buffer",
-        lengthCategory: "medium",
-        content: `#include <array>
-#include <cstddef>
-
-template <typename T, std::size_t N>
-class RingBuffer {
-public:
-    bool push(const T& value) {
-        if (size_ == N) return false;
-        data_[tail_] = value;
-        tail_ = (tail_ + 1) % N;
-        ++size_;
-        return true;
-    }
-
-    bool pop(T& value) {
-        if (size_ == 0) return false;
-        value = data_[head_];
-        head_ = (head_ + 1) % N;
-        --size_;
-        return true;
-    }
-
-    std::size_t size() const { return size_; }
-    bool empty() const { return size_ == 0; }
-
-private:
-    std::array<T, N> data_{};
-    std::size_t head_ = 0;
-    std::size_t tail_ = 0;
-    std::size_t size_ = 0;
-};`,
-    }),
-];
-
-// const DATASET_SNIPPETS = normalizeDataset(leetcodeDataset);
-export const CURATED_SNIPPETS_LIST = CURATED_SNIPPETS;
-// const SOURCE_SNIPPETS =
-//     CURATED_SNIPPETS.length > 0
-//         ? [...CURATED_SNIPPETS, ...DATASET_SNIPPETS]
-//         : DATASET_SNIPPETS; // curated snippets guarantee usable content even if LeetCode data is filtered out
-// const PROBLEMS = buildProblems(SOURCE_SNIPPETS);
-
-export function normalizeDataset(raw: unknown): Snippet[] {
+export function normalizeCatalog(raw: unknown): Snippet[] {
     if (!Array.isArray(raw)) return [];
-    return raw.flatMap((entry: DatasetSnippet): Snippet[] => {
+    return raw.flatMap((entry: CatalogEntry): Snippet[] => {
         if (!entry || typeof entry !== "object") return [];
-        if (!isSupportedLanguage(entry.lang)) return [];
-        if (typeof entry.content !== "string" || entry.content.length === 0) return [];
+        if (!isSupportedLanguage(entry.language)) return [];
+        if (!isSnippetType(entry.type)) return [];
+        const snippetType = entry.type;
+        if (typeof entry.content !== "string" || entry.content.trim().length === 0) return [];
+        if (!Array.isArray(entry.topics) || entry.topics.length === 0) return [];
+        const topics = entry.topics.filter((topic): topic is CatalogTopic =>
+            isTopicForType(topic, snippetType)
+        );
+        if (topics.length === 0) return [];
 
-        const sanitizedContent = sanitizeContentForLanguage(entry.content, entry.lang);
-        const normalizedContent = normalizeContent(sanitizedContent);
-        // Always measure the normalized content; raw LeetCode stubs often over-report lines.
+        const normalizedContent = normalizeContent(entry.content);
         const lines = countLines(normalizedContent);
-        const lengthCategory = classifyLength(lines);
-        const difficulty = isDifficulty(entry.difficulty) ? entry.difficulty : "easy";
-        const title = typeof entry.title === "string" && entry.title.length > 0 ? entry.title : "LeetCode snippet";
         const sourceSlug = typeof entry.sourceSlug === "string" ? entry.sourceSlug : undefined;
-        const fallbackProblemId =
-            typeof entry.id === "string" && entry.id.length > 0 ? entry.id : computeProblemId(entry.lang, "snippet");
+        const id =
+            typeof entry.id === "string" && entry.id.length > 0
+                ? entry.id
+                : computeProblemId(entry.language, sourceSlug ?? entry.title ?? "snippet");
         const problemId =
             typeof entry.problemId === "string" && entry.problemId.length > 0
                 ? entry.problemId
-                : computeProblemId(entry.lang, sourceSlug ?? fallbackProblemId);
-        const id = typeof entry.id === "string" && entry.id.length > 0 ? entry.id : problemId;
-        const frontendId =
-            typeof entry.frontendId === "number" && Number.isFinite(entry.frontendId) ? entry.frontendId : undefined;
-
-        if (isSkeletal(normalizedContent, entry.lang)) return [];
+                : computeProblemId(entry.language, sourceSlug ?? id);
+        const title = typeof entry.title === "string" && entry.title.length > 0 ? entry.title : "Untitled";
 
         return [
             {
@@ -595,34 +103,31 @@ export function normalizeDataset(raw: unknown): Snippet[] {
                 problemId,
                 title,
                 content: normalizedContent,
-                language: entry.lang,
-                lengthCategory,
-                difficulty,
+                language: entry.language,
+                type: snippetType,
+                topics,
+                lengthCategory: classifyLength(lines),
                 lines,
                 sourceSlug,
-                frontendId,
             },
         ];
     });
 }
 
-function defineSnippet(def: SnippetDefinition): Snippet {
-    const sanitizedContent = sanitizeContentForLanguage(def.content, def.language);
-    const normalizedContent = normalizeContent(sanitizedContent);
-    const lines = countLines(normalizedContent);
-    const lengthCategory = def.lengthCategory ?? classifyLength(lines);
-    const sourceSlug = def.sourceSlug ?? def.id;
-    return {
-        id: def.id,
-        problemId: computeProblemId(def.language, sourceSlug),
-        title: def.title,
-        content: normalizedContent,
-        language: def.language,
-        lengthCategory,
-        difficulty: def.difficulty,
-        lines,
-        sourceSlug,
-    };
+export function filterSnippets(
+    snippets: Snippet[],
+    language: SupportedLanguage,
+    filters: ContentFilters
+): Snippet[] {
+    const typeSet = new Set(filters.types);
+    const topicSet = new Set(filters.topics);
+    return snippets.filter(
+        (snippet) =>
+            snippet.id !== PLACEHOLDER_SNIPPET.id &&
+            snippet.language === language &&
+            typeSet.has(snippet.type) &&
+            snippet.topics.some((topic) => topicSet.has(topic))
+    );
 }
 
 function buildProblems(snippets: Snippet[]): Problem[] {
@@ -633,13 +138,20 @@ function buildProblems(snippets: Snippet[]): Problem[] {
             byProblem.set(snippet.problemId, {
                 id: snippet.problemId,
                 title: snippet.title,
-                summary: snippet.sourceSlug ? `LeetCode • ${snippet.sourceSlug}` : snippet.title,
+                summary: snippet.sourceSlug ?? snippet.title,
                 language: snippet.language,
-                availableLengths: [snippet.lengthCategory],
+                types: [snippet.type],
+                topics: [...snippet.topics],
             });
-        } else if (!existing.availableLengths.includes(snippet.lengthCategory)) {
-            existing.availableLengths.push(snippet.lengthCategory);
-            existing.availableLengths.sort((a, b) => LENGTH_ORDER[a] - LENGTH_ORDER[b]);
+            continue;
+        }
+        if (!existing.types.includes(snippet.type)) {
+            existing.types.push(snippet.type);
+        }
+        for (const topic of snippet.topics) {
+            if (!existing.topics.includes(topic)) {
+                existing.topics.push(topic);
+            }
         }
     }
     return Array.from(byProblem.values()).sort((a, b) => a.title.localeCompare(b.title));
@@ -649,48 +161,29 @@ export function buildProblemsFromSnippets(snippets: Snippet[]): Problem[] {
     return buildProblems(snippets);
 }
 
-function matchesLength(lengths: SnippetLength[], requested?: SnippetLength) {
-    if (!requested) return true;
-    return lengths.includes(requested);
-}
-
-export function getProblems(snippets: Snippet[], language: SupportedLanguage, filters?: ProblemFilters): Problem[] {
-    const problems = buildProblems(snippets);
-    return problems.filter(
-        (problem) => problem.language === language && matchesLength(problem.availableLengths, filters?.length)
-    );
+export function getProblems(snippets: Snippet[], language: SupportedLanguage, filters: ContentFilters): Problem[] {
+    return buildProblems(filterSnippets(snippets, language, filters));
 }
 
 export function getProblemSnippets(
     snippets: Snippet[],
     language: SupportedLanguage,
     problemId: string,
-    filters?: SnippetFilters
+    filters: ContentFilters
 ): Snippet[] {
-    return snippets.filter(
-        (snippet) =>
-            snippet.language === language &&
-            snippet.problemId === problemId &&
-            (filters?.length ? snippet.lengthCategory === filters.length : true)
-    );
+    return filterSnippets(snippets, language, filters).filter((snippet) => snippet.problemId === problemId);
 }
 
-export function getSnippet(snippets: Snippet[], language: SupportedLanguage, filters?: SnippetFilters): Snippet {
-    const preferred = snippets.find(
-        (snippet) => snippet.language === language && (!filters?.length || snippet.lengthCategory === filters.length)
-    );
-    const fallback = snippets.find((snippet) => snippet.language === language) ?? snippets[0];
-    return preferred ?? fallback;
+export function getSnippet(
+    snippets: Snippet[],
+    language: SupportedLanguage,
+    filters: ContentFilters
+): Snippet {
+    const filtered = filterSnippets(snippets, language, filters);
+    return filtered[0] ?? PLACEHOLDER_SNIPPET;
 }
 
 export function getSnippetVarianceTag(snippet: Snippet): SnippetVarianceTag {
-    if (
-        snippet.language === "python" &&
-        snippet.lengthCategory === "short" &&
-        PYTHON_PANDAS_SIGNATURE_PATTERN.test(snippet.content)
-    ) {
-        return "python-pandas-signature";
-    }
     if (isSignatureOnlySnippet(snippet)) {
         return "signature-only";
     }
@@ -700,20 +193,14 @@ export function getSnippetVarianceTag(snippet: Snippet): SnippetVarianceTag {
 export function getSnippetVarietyScore(snippet: Snippet): number {
     const varianceTag = getSnippetVarianceTag(snippet);
     let score = Math.min(snippet.lines, 40) / 4;
-
-    if (varianceTag === "python-pandas-signature") {
-        score -= 12;
-    } else if (varianceTag === "signature-only") {
+    if (varianceTag === "signature-only") {
         score -= 6;
     } else {
         score += 4;
     }
-
     if (snippet.lengthCategory === "medium") score += 1;
     if (snippet.lengthCategory === "long") score += 2;
-    if (snippet.difficulty === "medium") score += 1;
-    if (snippet.difficulty === "hard") score += 2;
-
+    if (snippet.type === "problem") score += 1;
     return score;
 }
 
@@ -723,29 +210,14 @@ function isSignatureOnlySnippet(snippet: Snippet): boolean {
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line.length > 0);
-
     if (nonEmpty.length === 0) return true;
-
     return nonEmpty.every((line) => {
-        if (
-            line.startsWith("import ") ||
-            line.startsWith("from ") ||
-            line.startsWith("#include ") ||
-            line.startsWith("package ") ||
-            line.startsWith("@")
-        ) {
+        if (line.startsWith("import ") || line.startsWith("from ") || line.startsWith("@")) {
             return true;
         }
-
-        if (
-            /^def [a-zA-Z_]\w*\(.*\):$/.test(line) ||
-            /^class [a-zA-Z_]\w*(\([^)]*\))?:$/.test(line) ||
-            /^(public|private|protected)\s+.*\)\s*\{?$/.test(line) ||
-            /^template\s*</.test(line)
-        ) {
+        if (/^def [a-zA-Z_]\w*\(.*\):$/.test(line) || /^class [a-zA-Z_]\w*(\([^)]*\))?:$/.test(line)) {
             return true;
         }
-
         return false;
     });
 }
@@ -758,148 +230,6 @@ function normalizeContent(content: string): string {
     return trimmed.endsWith("\n") ? trimmed : `${trimmed}\n`;
 }
 
-function sanitizeContentForLanguage(content: string, language: SupportedLanguage): string {
-    return stripComments(content, language);
-}
-
-function stripComments(content: string, language: SupportedLanguage): string {
-    if (language === "python") {
-        return stripPythonComments(content);
-    }
-    return stripCStyleComments(content);
-}
-
-function stripPythonComments(content: string): string {
-    let result = "";
-    let i = 0;
-
-    while (i < content.length) {
-        // Check for triple-quoted strings (""" or ''')
-        if (i + 2 < content.length) {
-            const triple = content.slice(i, i + 3);
-            if (triple === '"""' || triple === "'''") {
-                const preceding = content.slice(Math.max(0, i - 20), i).trimEnd();
-                const isDocstring = preceding.endsWith(":") || preceding.length === 0 || preceding.endsWith("\n");
-
-                const closeIdx = content.indexOf(triple, i + 3);
-                if (closeIdx === -1) {
-                    result += content.slice(i);
-                    break;
-                }
-
-                if (isDocstring) {
-                    i = closeIdx + 3;
-                    continue;
-                } else {
-                    result += content.slice(i, closeIdx + 3);
-                    i = closeIdx + 3;
-                    continue;
-                }
-            }
-        }
-
-        const ch = content[i];
-        if (ch === '"' || ch === "'") {
-            const quote = ch;
-            result += ch;
-            i++;
-            while (i < content.length && content[i] !== quote) {
-                if (content[i] === "\\" && i + 1 < content.length) {
-                    result += content[i] + content[i + 1];
-                    i += 2;
-                    continue;
-                }
-                if (content[i] === "\n") break;
-                result += content[i];
-                i++;
-            }
-            if (i < content.length && content[i] === quote) {
-                result += content[i];
-                i++;
-            }
-            continue;
-        }
-
-        if (ch === "#") {
-            while (i < content.length && content[i] !== "\n") i++;
-            continue;
-        }
-
-        result += ch;
-        i++;
-    }
-
-    return result;
-}
-
-function stripCStyleComments(content: string): string {
-    let result = "";
-    let i = 0;
-    let inSingle = false;
-    let inDouble = false;
-    let inTemplate = false;
-    let inBlock = false;
-    let inLine = false;
-
-    while (i < content.length) {
-        const ch = content[i];
-        const next = i + 1 < content.length ? content[i + 1] : "";
-
-        if (inBlock) {
-            if (ch === "*" && next === "/") {
-                inBlock = false;
-                i += 2;
-                continue;
-            }
-            i++;
-            continue;
-        }
-
-        if (inLine) {
-            if (ch === "\n") {
-                inLine = false;
-                result += ch;
-            }
-            i++;
-            continue;
-        }
-
-        // Count consecutive backslashes before current position
-        let backslashCount = 0;
-        let j = i - 1;
-        while (j >= 0 && content[j] === "\\") {
-            backslashCount++;
-            j--;
-        }
-        const isEscaped = backslashCount % 2 !== 0;
-
-        if (!isEscaped) {
-            if (ch === "'" && !inDouble && !inTemplate) { inSingle = !inSingle; }
-            else if (ch === '"' && !inSingle && !inTemplate) { inDouble = !inDouble; }
-            else if (ch === '`' && !inSingle && !inDouble) { inTemplate = !inTemplate; }
-        }
-
-        const inString = inSingle || inDouble || inTemplate;
-
-        if (!inString && ch === "/" && next === "*") {
-            inBlock = true;
-            i += 2;
-            continue;
-        }
-
-        if (!inString && ch === "/" && next === "/") {
-            inLine = true;
-            i += 2;
-            continue;
-        }
-
-        result += ch;
-        i++;
-    }
-
-    return result;
-}
-
 function condenseBlankRuns(content: string): string {
     const lines = content.split("\n");
     const result: string[] = [];
@@ -908,12 +238,8 @@ function condenseBlankRuns(content: string): string {
         const isBlank = line.trim().length === 0;
         if (isBlank) {
             blankRun += 1;
-            if (result.length === 0) {
-                continue; // drop leading blank lines
-            }
-            if (blankRun > 1) {
-                continue; // limit to single blank line
-            }
+            if (result.length === 0) continue;
+            if (blankRun > 1) continue;
         } else {
             blankRun = 0;
         }
@@ -941,9 +267,5 @@ function computeProblemId(language: SupportedLanguage, slug: string): string {
 }
 
 function isSupportedLanguage(value: unknown): value is SupportedLanguage {
-    return value === "javascript" || value === "python" || value === "java" || value === "cpp";
-}
-
-function isDifficulty(value: unknown): value is Difficulty {
-    return value === "easy" || value === "medium" || value === "hard";
+    return value === "javascript" || value === "python";
 }

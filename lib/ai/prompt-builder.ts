@@ -5,11 +5,9 @@
 
 import { z } from "zod";
 import type { DrillRequest } from "./types";
-import type { SupportedLanguage, SnippetLength, Difficulty } from "@/lib/snippets";
-
-// ---------------------------------------------------------------------------
-// Stdlib Allowlists
-// ---------------------------------------------------------------------------
+import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
+import { SNIPPET_TYPE_LABELS } from "@/lib/catalog";
+import type { SnippetType } from "@/lib/catalog";
 
 const STDLIB_ALLOWLISTS: Record<SupportedLanguage, string[]> = {
     python: [
@@ -18,35 +16,14 @@ const STDLIB_ALLOWLISTS: Record<SupportedLanguage, string[]> = {
         "pathlib", "datetime", "random", "string", "heapq", "bisect",
         "operator", "copy", "io", "contextlib",
     ],
-    java: [
-        "java.util", "java.io", "java.lang", "java.math",
-        "java.util.stream", "java.util.function", "java.time",
-        "java.util.concurrent", "java.nio",
-    ],
-    cpp: [
-        "vector", "string", "map", "unordered_map", "set",
-        "unordered_set", "algorithm", "numeric", "iostream",
-        "sstream", "fstream", "memory", "functional", "utility",
-        "queue", "stack", "deque", "array", "tuple", "optional",
-        "variant", "any", "cassert", "cmath", "cstdio", "cstdlib",
-        "climits", "iterator", "stdexcept", "type_traits",
-    ],
-    javascript: [],  // No imports allowed (everything is global)
+    javascript: [],
 };
-
-// ---------------------------------------------------------------------------
-// Line Count Ranges
-// ---------------------------------------------------------------------------
 
 const LINE_RANGES: Record<SnippetLength, { min: number; max: number }> = {
-    short:  { min: 3,  max: 10 },
+    short: { min: 3, max: 10 },
     medium: { min: 11, max: 30 },
-    long:   { min: 31, max: 60 },
+    long: { min: 31, max: 60 },
 };
-
-// ---------------------------------------------------------------------------
-// Response Schema for AI SDK
-// ---------------------------------------------------------------------------
 
 export const drillResponseSchema = z.object({
     title: z.string().describe("Short descriptive name, e.g. 'Binary Search Iterator'"),
@@ -54,18 +31,14 @@ export const drillResponseSchema = z.object({
     explanation: z.string().describe("1-2 sentences about what the code does"),
     focusAreas: z.array(z.string()).describe("Token categories this drills"),
     reasoning: z.string().describe("Why this drill was chosen for this user"),
-    estimatedDifficulty: z.enum(["easy", "medium", "hard"]),
 });
-
-// ---------------------------------------------------------------------------
-// Prompt Construction
-// ---------------------------------------------------------------------------
 
 function getSystemPrompt(language: SupportedLanguage, minLines: number, maxLines: number, targetPatterns: string[]): string {
     const stdlibAllowlist = STDLIB_ALLOWLISTS[language];
-    const stdlibSection = stdlibAllowlist.length > 0
-        ? `3. Standard library imports are ALLOWED: ${stdlibAllowlist.join(", ")}\n4. Third-party/external imports are FORBIDDEN`
-        : `3. No imports allowed (everything is global)`;
+    const stdlibSection =
+        stdlibAllowlist.length > 0
+            ? `3. Standard library imports are ALLOWED: ${stdlibAllowlist.join(", ")}\n4. Third-party/external imports are FORBIDDEN`
+            : `3. No imports allowed (everything is global)`;
 
     return `You are a code drill generator for CodeSprint, a typing practice app for
 programmers. You generate short, self-contained code snippets that users
@@ -89,7 +62,7 @@ Respond with valid JSON matching the provided schema.`;
 
 function getUserPrompt(
     language: SupportedLanguage,
-    difficulty: Difficulty,
+    contentType: SnippetType,
     lengthCategory: SnippetLength,
     minLines: number,
     maxLines: number,
@@ -97,15 +70,17 @@ function getUserPrompt(
     userContext: DrillRequest["userContext"],
     recentDrillTitles: string[]
 ): string {
-    const weakPatternsText = weakPatterns.length > 0
-        ? weakPatterns.map((p) => `- ${p.label}: ${Math.round((1 - p.errorRate) * 100)}% accuracy (${p.errorCount} errors)`).join("\n")
-        : "- Default focus: keywords, operators, delimiters";
+    const typeLabel = SNIPPET_TYPE_LABELS[contentType].toLowerCase();
+    const weakPatternsText =
+        weakPatterns.length > 0
+            ? weakPatterns
+                  .map((p) => `- ${p.label}: ${Math.round((1 - p.errorRate) * 100)}% accuracy (${p.errorCount} errors)`)
+                  .join("\n")
+            : "- Default focus: keywords, operators, delimiters";
 
-    const recentTitlesText = recentDrillTitles.length > 0
-        ? recentDrillTitles.join(", ")
-        : "None yet";
+    const recentTitlesText = recentDrillTitles.length > 0 ? recentDrillTitles.join(", ") : "None yet";
 
-    return `Generate a ${difficulty} ${language} coding drill.
+    return `Generate a ${typeLabel} ${language} coding drill.
 
 Target length: ${lengthCategory} (${minLines}-${maxLines} lines)
 
@@ -121,26 +96,17 @@ Recent drill titles to avoid repeating themes:
 ${recentTitlesText}
 
 Generate a drill that specifically exercises the user's weak patterns
-while remaining at an appropriate difficulty level.`;
+while remaining at an appropriate skill level.`;
 }
 
-/**
- * Build prompts for AI drill generation
- */
 export function buildPrompt(request: DrillRequest): { systemPrompt: string; userPrompt: string } {
     const { min, max } = LINE_RANGES[request.lengthCategory];
-    const targetPatterns = request.targetTokenCategories;
+    const contentType = request.contentType ?? "template";
 
-    const systemPrompt = getSystemPrompt(
-        request.language,
-        min,
-        max,
-        targetPatterns
-    );
-
+    const systemPrompt = getSystemPrompt(request.language, min, max, request.targetTokenCategories);
     const userPrompt = getUserPrompt(
         request.language,
-        request.difficulty,
+        contentType,
         request.lengthCategory,
         min,
         max,
@@ -152,21 +118,12 @@ export function buildPrompt(request: DrillRequest): { systemPrompt: string; user
     return { systemPrompt, userPrompt };
 }
 
-/**
- * Get the stdlib allowlist for a language
- */
 export function getStdlibAllowlist(language: SupportedLanguage): string[] {
     return [...STDLIB_ALLOWLISTS[language]];
 }
 
-/**
- * Check if an import is allowed for a language
- */
 export function isImportAllowed(language: SupportedLanguage, importName: string): boolean {
     const allowlist = STDLIB_ALLOWLISTS[language];
-    if (allowlist.length === 0) return false; // No imports allowed
-
-    return allowlist.some((allowed) => 
-        importName === allowed || importName.startsWith(`${allowed}.`)
-    );
+    if (allowlist.length === 0) return false;
+    return allowlist.some((allowed) => importName === allowed || importName.startsWith(`${allowed}.`));
 }

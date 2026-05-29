@@ -26,8 +26,6 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 const LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
     javascript: "JavaScript",
     python: "Python",
-    java: "Java",
-    cpp: "C++",
 };
 
 function formatDuration(ms: number): string {
@@ -246,9 +244,7 @@ function LanguageStatsGrid({ stats }: { stats: LanguageStat[] }) {
                             justifyContent="center"
                         >
                             <Text fontWeight="bold" fontSize="xs">
-                                {stat.language === "cpp"
-                                    ? "C++"
-                                    : stat.language.slice(0, 2).toUpperCase()}
+                                {LANGUAGE_LABELS[stat.language].slice(0, 2).toUpperCase()}
                             </Text>
                         </Box>
                         <Box>
@@ -285,23 +281,22 @@ function LanguageStatsGrid({ stats }: { stats: LanguageStat[] }) {
     );
 }
 
-function DifficultyBreakdown({ averages }: { averages: PersonalAverages }) {
-    const difficulties = ["easy", "medium", "hard"] as const;
+function ContentTypeBreakdown({ averages }: { averages: PersonalAverages }) {
+    const types = ["template", "problem"] as const;
     const colors = {
-        easy: "var(--success)",
-        medium: "var(--warning)",
-        hard: "var(--error)",
+        template: "var(--success)",
+        problem: "var(--accent)",
     };
 
     return (
         <Flex gap={3} flexWrap="wrap">
-            {difficulties.map((difficulty) => {
-                const data = averages.byDifficulty[difficulty];
+            {types.map((contentType) => {
+                const data = averages.byContentType[contentType];
                 if (data.sessions === 0) return null;
 
                 return (
                     <Box
-                        key={difficulty}
+                        key={contentType}
                         flex="1"
                         minW="120px"
                         bg="var(--surface)"
@@ -314,11 +309,11 @@ function DifficultyBreakdown({ averages }: { averages: PersonalAverages }) {
                             fontSize="xs"
                             textTransform="uppercase"
                             letterSpacing="0.05em"
-                            color={colors[difficulty]}
+                            color={colors[contentType]}
                             fontWeight="bold"
                             mb={1}
                         >
-                            {difficulty}
+                            {contentType}
                         </Text>
                         <Text fontSize="xl" fontWeight="bold">
                             {Math.round(data.wpm)}
@@ -561,7 +556,7 @@ export default function AnalyticsDashboard() {
                             <Text fontWeight="bold" mb={3}>
                                 Performance by Difficulty
                             </Text>
-                            <DifficultyBreakdown averages={personalAverages} />
+                            <ContentTypeBreakdown averages={personalAverages} />
                         </Box>
 
                         {/* Cumulative Progress */}

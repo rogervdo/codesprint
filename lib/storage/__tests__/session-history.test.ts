@@ -43,7 +43,7 @@ function createMockInput(overrides: Partial<CreateSessionInput> = {}): CreateSes
         snippetId: "test-snippet",
         language: "javascript",
         lengthCategory: "medium",
-        difficulty: "easy",
+        contentType: "template",
         wpm: 60,
         rawWpm: 65,
         accuracy: 0.95,
@@ -143,11 +143,11 @@ describe("session-history", () => {
             expect(sessions).toHaveLength(2);
         });
 
-        it("should filter by difficulty", () => {
-            createSession(createMockInput({ difficulty: "easy" }));
-            createSession(createMockInput({ difficulty: "hard" }));
+        it("should filter by content type", () => {
+            createSession(createMockInput({ contentType: "template" }));
+            createSession(createMockInput({ contentType: "problem" }));
 
-            const sessions = getSessions({ difficulty: "hard" });
+            const sessions = getSessions({ contentType: "problem" });
             expect(sessions).toHaveLength(1);
         });
 
@@ -172,11 +172,11 @@ describe("session-history", () => {
         });
 
         it("should combine multiple filters", () => {
-            createSession(createMockInput({ language: "javascript", difficulty: "easy" }));
-            createSession(createMockInput({ language: "javascript", difficulty: "hard" }));
-            createSession(createMockInput({ language: "python", difficulty: "easy" }));
+            createSession(createMockInput({ language: "javascript", contentType: "template" }));
+            createSession(createMockInput({ language: "javascript", contentType: "problem" }));
+            createSession(createMockInput({ language: "python", contentType: "template" }));
 
-            const sessions = getSessions({ language: "javascript", difficulty: "easy" });
+            const sessions = getSessions({ language: "javascript", contentType: "template" });
             expect(sessions).toHaveLength(1);
         });
     });

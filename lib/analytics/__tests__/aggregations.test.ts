@@ -38,7 +38,7 @@ function createMockInput(overrides: Partial<CreateSessionInput> = {}): CreateSes
         snippetId: "test-snippet",
         language: "javascript",
         lengthCategory: "medium",
-        difficulty: "easy",
+        contentType: "template",
         wpm: 60,
         rawWpm: 65,
         accuracy: 0.95,
@@ -298,21 +298,18 @@ describe("aggregations", () => {
             expect(averages.worstWpm).toBe(60);
         });
 
-        it("should calculate stats by difficulty", () => {
-            createSessionDirectly(createMockInput({ difficulty: "easy", wpm: 80, accuracy: 0.95 }));
-            createSessionDirectly(createMockInput({ difficulty: "easy", wpm: 90, accuracy: 0.97 }));
-            createSessionDirectly(createMockInput({ difficulty: "medium", wpm: 60, accuracy: 0.9 }));
-            createSessionDirectly(createMockInput({ difficulty: "hard", wpm: 50, accuracy: 0.85 }));
+        it("should calculate stats by content type", () => {
+            createSessionDirectly(createMockInput({ contentType: "template", wpm: 80, accuracy: 0.95 }));
+            createSessionDirectly(createMockInput({ contentType: "template", wpm: 90, accuracy: 0.97 }));
+            createSessionDirectly(createMockInput({ contentType: "problem", wpm: 50, accuracy: 0.85 }));
 
             const averages = getPersonalAverages();
 
-            expect(averages.byDifficulty.easy.wpm).toBe(85);
-            expect(averages.byDifficulty.easy.accuracy).toBeCloseTo(0.96, 2);
-            expect(averages.byDifficulty.easy.sessions).toBe(2);
-            expect(averages.byDifficulty.medium.wpm).toBe(60);
-            expect(averages.byDifficulty.medium.sessions).toBe(1);
-            expect(averages.byDifficulty.hard.wpm).toBe(50);
-            expect(averages.byDifficulty.hard.sessions).toBe(1);
+            expect(averages.byContentType.template.wpm).toBe(85);
+            expect(averages.byContentType.template.accuracy).toBeCloseTo(0.96, 2);
+            expect(averages.byContentType.template.sessions).toBe(2);
+            expect(averages.byContentType.problem.wpm).toBe(50);
+            expect(averages.byContentType.problem.sessions).toBe(1);
         });
 
         it("should calculate stats by length category", () => {
@@ -357,13 +354,12 @@ describe("aggregations", () => {
             expect(averages.improvementRate).toBe(-1);
         });
 
-        it("should handle empty difficulty/length categories", () => {
-            createSessionDirectly(createMockInput({ difficulty: "easy", lengthCategory: "short" }));
+        it("should handle empty content type/length categories", () => {
+            createSessionDirectly(createMockInput({ contentType: "template", lengthCategory: "short" }));
 
             const averages = getPersonalAverages();
 
-            expect(averages.byDifficulty.medium.sessions).toBe(0);
-            expect(averages.byDifficulty.hard.sessions).toBe(0);
+            expect(averages.byContentType.problem.sessions).toBe(0);
             expect(averages.byLength.medium.sessions).toBe(0);
             expect(averages.byLength.long.sessions).toBe(0);
         });

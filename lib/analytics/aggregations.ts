@@ -1,4 +1,5 @@
-import type { SupportedLanguage, Difficulty, SnippetLength } from "@/lib/snippets";
+import type { SupportedLanguage, SnippetLength } from "@/lib/snippets";
+import type { SnippetType } from "@/lib/catalog";
 import { getSessions, type SessionRecord, type SessionFilters } from "@/lib/storage/session-history";
 
 export type TimeRange = "day" | "week" | "month" | "all";
@@ -36,7 +37,7 @@ export type PersonalAverages = {
     totalTimeMs: number;
     bestWpm: number;
     worstWpm: number;
-    byDifficulty: Record<Difficulty, { wpm: number; accuracy: number; sessions: number }>;
+    byContentType: Record<SnippetType, { wpm: number; accuracy: number; sessions: number }>;
     byLength: Record<SnippetLength, { wpm: number; accuracy: number; sessions: number }>;
     improvementRate: number;
 };
@@ -190,11 +191,16 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
     const allSessions = getSessions();
     const sessions = filterByDateRange(allSessions, range);
 
-    const emptyDifficultyStats = (): Record<Difficulty, { wpm: number; accuracy: number; sessions: number }> => ({
-        easy: { wpm: 0, accuracy: 0, sessions: 0 },
-        medium: { wpm: 0, accuracy: 0, sessions: 0 },
-        hard: { wpm: 0, accuracy: 0, sessions: 0 },
+    const emptyContentTypeStats = (): Record<SnippetType, { wpm: number; accuracy: number; sessions: number }> => ({
+        template: { wpm: 0, accuracy: 0, sessions: 0 },
+        problem: { wpm: 0, accuracy: 0, sessions: 0 },
     });
+
+    const resolveContentType = (session: SessionRecord): SnippetType => {
+        if (session.contentType) return session.contentType;
+        if (session.difficulty === "hard" || session.difficulty === "medium") return "problem";
+        return "template";
+    };
 
     const emptyLengthStats = (): Record<SnippetLength, { wpm: number; accuracy: number; sessions: number }> => ({
         short: { wpm: 0, accuracy: 0, sessions: 0 },
@@ -210,7 +216,7 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
             totalTimeMs: 0,
             bestWpm: 0,
             worstWpm: 0,
-            byDifficulty: emptyDifficultyStats(),
+            byContentType: emptyContentTypeStats(),
             byLength: emptyLengthStats(),
             improvementRate: 0,
         };
@@ -222,13 +228,12 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
     const bestWpm = sessions.reduce((max, s) => (s.wpm > max ? s.wpm : max), 0);
     const worstWpm = sessions.length > 0 ? sessions.reduce((min, s) => (s.wpm < min ? s.wpm : min), Infinity) : 0;
 
-    const byDifficulty = emptyDifficultyStats();
+    const byContentType = emptyContentTypeStats();
     const byLength = emptyLengthStats();
 
-    const difficultyAccum: Record<Difficulty, { wpmSum: number; accSum: number; count: number }> = {
-        easy: { wpmSum: 0, accSum: 0, count: 0 },
-        medium: { wpmSum: 0, accSum: 0, count: 0 },
-        hard: { wpmSum: 0, accSum: 0, count: 0 },
+    const contentTypeAccum: Record<SnippetType, { wpmSum: number; accSum: number; count: number }> = {
+        template: { wpmSum: 0, accSum: 0, count: 0 },
+        problem: { wpmSum: 0, accSum: 0, count: 0 },
     };
 
     const lengthAccum: Record<SnippetLength, { wpmSum: number; accSum: number; count: number }> = {
@@ -238,19 +243,20 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
     };
 
     for (const session of sessions) {
-        difficultyAccum[session.difficulty].wpmSum += session.wpm;
-        difficultyAccum[session.difficulty].accSum += session.accuracy;
-        difficultyAccum[session.difficulty].count += 1;
+        const contentType = resolveContentType(session);
+        contentTypeAccum[contentType].wpmSum += session.wpm;
+        contentTypeAccum[contentType].accSum += session.accuracy;
+        contentTypeAccum[contentType].count += 1;
 
         lengthAccum[session.lengthCategory].wpmSum += session.wpm;
         lengthAccum[session.lengthCategory].accSum += session.accuracy;
         lengthAccum[session.lengthCategory].count += 1;
     }
 
-    for (const difficulty of ["easy", "medium", "hard"] as Difficulty[]) {
-        const accum = difficultyAccum[difficulty];
+    for (const contentType of ["template", "problem"] as SnippetType[]) {
+        const accum = contentTypeAccum[contentType];
         if (accum.count > 0) {
-            byDifficulty[difficulty] = {
+            byContentType[contentType] = {
                 wpm: accum.wpmSum / accum.count,
                 accuracy: accum.accSum / accum.count,
                 sessions: accum.count,
@@ -279,7 +285,7 @@ export function getPersonalAverages(range: TimeRange = "all"): PersonalAverages 
         totalTimeMs: totalTime,
         bestWpm,
         worstWpm,
-        byDifficulty,
+        byContentType,
         byLength,
         improvementRate,
     };

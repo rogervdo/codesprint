@@ -1,6 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { ProblemTopic, SnippetType, TemplateTopic } from "@/lib/catalog";
+import { toggleMultiSelect } from "@/lib/catalog";
 import {
     DEFAULT_PREFERENCES,
     InterfaceMode,
@@ -30,7 +32,10 @@ type PreferencesContextValue = {
     setDebugGapBuffer: (enabled: boolean) => void;
     setSpacedRepetitionEnabled: (enabled: boolean) => void;
     setAdaptiveDifficultyEnabled: (enabled: boolean) => void;
-    // NEW - AI drill preferences
+    setContentType: (type: SnippetType) => void;
+    toggleProblemTopic: (topic: ProblemTopic) => void;
+    toggleTemplateTopic: (topic: TemplateTopic) => void;
+    // AI drill preferences
     setAIDrillsEnabled: (enabled: boolean) => void;
     setAIProvider: (provider: "claude" | "openai" | "fireworks") => void;
     setAIMaxDrillsPerDay: (limit: number) => void;
@@ -210,7 +215,25 @@ export function PreferencesProvider({
         setPreferences((prev) => ({ ...prev, adaptiveDifficultyEnabled: enabled }));
     }, []);
 
-    // NEW - AI drill preferences setters
+    const setContentType = useCallback((type: SnippetType) => {
+        setPreferences((prev) => ({ ...prev, contentType: type }));
+    }, []);
+
+    const toggleProblemTopic = useCallback((topic: ProblemTopic) => {
+        setPreferences((prev) => ({
+            ...prev,
+            problemTopics: toggleMultiSelect(prev.problemTopics, topic),
+        }));
+    }, []);
+
+    const toggleTemplateTopic = useCallback((topic: TemplateTopic) => {
+        setPreferences((prev) => ({
+            ...prev,
+            templateTopics: toggleMultiSelect(prev.templateTopics, topic),
+        }));
+    }, []);
+
+    // AI drill preferences setters
     const setAIDrillsEnabled = useCallback((enabled: boolean) => {
         setPreferences((prev) => ({ ...prev, aiDrillsEnabled: enabled }));
     }, []);
@@ -256,7 +279,9 @@ export function PreferencesProvider({
             setDebugGapBuffer,
             setSpacedRepetitionEnabled,
             setAdaptiveDifficultyEnabled,
-            // NEW - AI drill preferences
+            setContentType,
+            toggleProblemTopic,
+            toggleTemplateTopic,
             setAIDrillsEnabled,
             setAIProvider,
             setAIMaxDrillsPerDay,
@@ -278,7 +303,9 @@ export function PreferencesProvider({
             setDebugGapBuffer,
             setSpacedRepetitionEnabled,
             setAdaptiveDifficultyEnabled,
-            // NEW - AI drill preferences
+            setContentType,
+            toggleProblemTopic,
+            toggleTemplateTopic,
             setAIDrillsEnabled,
             setAIProvider,
             setAIMaxDrillsPerDay,

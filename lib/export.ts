@@ -63,14 +63,14 @@ export async function exportSessions(format: ExportFormat = "json"): Promise<str
 
 function sessionsToCSV(sessions: SessionRecord[]): string {
     const headers = [
-        "id", "date", "snippetId", "language", "lengthCategory", "difficulty",
+        "id", "date", "snippetId", "language", "lengthCategory", "contentType",
         "wpm", "rawWpm", "accuracy", "elapsedMs", "totalKeystrokes",
         "correctKeystrokes", "errorCount",
     ];
 
     const rows = sessions.map((s) =>
         [
-            s.id, s.date, s.snippetId, s.language, s.lengthCategory, s.difficulty,
+            s.id, s.date, s.snippetId, s.language, s.lengthCategory, s.contentType,
             s.wpm, s.rawWpm, s.accuracy, s.elapsedMs, s.totalKeystrokes,
             s.correctKeystrokes, s.errorCount,
         ].map(csvEscape).join(",")

@@ -21,7 +21,7 @@ function makeSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
         snippetId: "test-snippet",
         language: "javascript",
         lengthCategory: "medium",
-        difficulty: "easy",
+        contentType: "template",
         wpm: 60,
         rawWpm: 65,
         accuracy: 0.95,
@@ -139,17 +139,16 @@ describe("getPersonalAverages", () => {
         expect(avg.totalTimeMs).toBe(55000);
     });
 
-    it("breaks down by difficulty", () => {
+    it("breaks down by content type", () => {
         mockSessions.push(
-            makeSession({ difficulty: "easy", wpm: 80 }),
-            makeSession({ difficulty: "hard", wpm: 50 }),
+            makeSession({ contentType: "template", wpm: 80 }),
+            makeSession({ contentType: "problem", wpm: 50 }),
         );
         const avg = getPersonalAverages("all");
-        expect(avg.byDifficulty.easy.sessions).toBe(1);
-        expect(avg.byDifficulty.easy.wpm).toBe(80);
-        expect(avg.byDifficulty.hard.sessions).toBe(1);
-        expect(avg.byDifficulty.hard.wpm).toBe(50);
-        expect(avg.byDifficulty.medium.sessions).toBe(0);
+        expect(avg.byContentType.template.sessions).toBe(1);
+        expect(avg.byContentType.template.wpm).toBe(80);
+        expect(avg.byContentType.problem.sessions).toBe(1);
+        expect(avg.byContentType.problem.wpm).toBe(50);
     });
 
     it("breaks down by length", () => {
