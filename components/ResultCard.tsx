@@ -27,6 +27,7 @@ type ResultCardProps = {
     lengthCategory: string;
     errorLog: ErrorEntry[];
     onNext?: () => void;
+    onBack?: () => void;
     autoAdvanceDeadline: number | null;
     history: ResultGraphPoint[];
     patternScore?: number;
@@ -64,6 +65,7 @@ export default function ResultCard({
     errorLog,
     history,
     onNext,
+    onBack,
     autoAdvanceDeadline,
     patternScore,
     tokens,
@@ -320,6 +322,19 @@ export default function ResultCard({
 
                 {/* Actions */}
                 <MotionFlex gap={3} flexWrap="wrap" justify="center" mt={8} pt={5} borderTop="1px solid var(--border)">
+                    {onBack && (
+                        <Button
+                            onClick={onBack}
+                            size="lg"
+                            variant="outline"
+                            borderColor="var(--border)"
+                            color="var(--text)"
+                            _hover={{ bg: "var(--surface-hover)" }}
+                            px={8}
+                        >
+                            Back
+                        </Button>
+                    )}
                     {onNext && (
                         <Button
                             onClick={onNext}

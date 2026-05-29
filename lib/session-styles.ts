@@ -172,6 +172,11 @@ export function getRandomizeButtonStyles(isTerminalMode: boolean): Partial<Butto
     };
 }
 
+/** Compact icon button for topic bulk actions and similar controls */
+export function getIconPillButtonStyles(isTerminalMode: boolean): Partial<ButtonProps> {
+    return getRandomizeButtonStyles(isTerminalMode);
+}
+
 /**
  * Calculate layout gap based on interface mode
  */

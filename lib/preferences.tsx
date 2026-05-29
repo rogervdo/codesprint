@@ -2,7 +2,11 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ProblemTopic, SnippetType, TemplateTopic } from "@/lib/catalog";
-import { toggleMultiSelect } from "@/lib/catalog";
+import {
+    DEFAULT_PROBLEM_TOPICS,
+    DEFAULT_TEMPLATE_TOPICS,
+    toggleMultiSelect,
+} from "@/lib/catalog";
 import {
     DEFAULT_PREFERENCES,
     InterfaceMode,
@@ -35,6 +39,8 @@ type PreferencesContextValue = {
     setContentType: (type: SnippetType) => void;
     toggleProblemTopic: (topic: ProblemTopic) => void;
     toggleTemplateTopic: (topic: TemplateTopic) => void;
+    selectAllTopics: (type: SnippetType) => void;
+    clearAllTopics: (type: SnippetType) => void;
     // AI drill preferences
     setAIDrillsEnabled: (enabled: boolean) => void;
     setAIProvider: (provider: "claude" | "openai" | "fireworks") => void;
@@ -233,6 +239,22 @@ export function PreferencesProvider({
         }));
     }, []);
 
+    const selectAllTopics = useCallback((type: SnippetType) => {
+        setPreferences((prev) =>
+            type === "template"
+                ? { ...prev, templateTopics: [...DEFAULT_TEMPLATE_TOPICS] }
+                : { ...prev, problemTopics: [...DEFAULT_PROBLEM_TOPICS] }
+        );
+    }, []);
+
+    const clearAllTopics = useCallback((type: SnippetType) => {
+        setPreferences((prev) =>
+            type === "template"
+                ? { ...prev, templateTopics: [DEFAULT_TEMPLATE_TOPICS[0]] }
+                : { ...prev, problemTopics: [DEFAULT_PROBLEM_TOPICS[0]] }
+        );
+    }, []);
+
     // AI drill preferences setters
     const setAIDrillsEnabled = useCallback((enabled: boolean) => {
         setPreferences((prev) => ({ ...prev, aiDrillsEnabled: enabled }));
@@ -282,6 +304,8 @@ export function PreferencesProvider({
             setContentType,
             toggleProblemTopic,
             toggleTemplateTopic,
+            selectAllTopics,
+            clearAllTopics,
             setAIDrillsEnabled,
             setAIProvider,
             setAIMaxDrillsPerDay,
@@ -306,6 +330,8 @@ export function PreferencesProvider({
             setContentType,
             toggleProblemTopic,
             toggleTemplateTopic,
+            selectAllTopics,
+            clearAllTopics,
             setAIDrillsEnabled,
             setAIProvider,
             setAIMaxDrillsPerDay,

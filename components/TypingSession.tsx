@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Stack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -56,6 +56,8 @@ export default function TypingSession() {
         setContentType,
         toggleProblemTopic,
         toggleTemplateTopic,
+        selectAllTopics,
+        clearAllTopics,
     } = usePreferences();
 
     const activeTopics =
@@ -81,6 +83,14 @@ export default function TypingSession() {
         },
         [preferences.contentType, toggleProblemTopic, toggleTemplateTopic]
     );
+
+    const handleSelectAllTopics = useCallback(() => {
+        selectAllTopics(preferences.contentType);
+    }, [preferences.contentType, selectAllTopics]);
+
+    const handleClearAllTopics = useCallback(() => {
+        clearAllTopics(preferences.contentType);
+    }, [preferences.contentType, clearAllTopics]);
 
     const editorFontSize = preferences.fontSize;
     const storedSurfaceStyle = preferences.surfaceStyle ?? "panel";
@@ -116,13 +126,15 @@ export default function TypingSession() {
         contentFilters,
     });
 
-    // Typing Engine
     const engine = useTypingEngine({
         snippet: controls.snippet,
     });
 
-    // Update ref with actual reset function
-    engineResetRef.current = engine.reset;
+    useEffect(() => {
+        engineResetRef.current = () => {
+            engine.reset();
+        };
+    }, [engine.reset]);
 
     // Achievements, XP, Streaks
     const achievements = useAchievements({
@@ -188,10 +200,9 @@ export default function TypingSession() {
         lengthCategory: controls.snippet.lengthCategory,
         contentType: controls.snippet.type,
         isAIDrill: controls.snippet.problemId.startsWith("ai-drill-"),
-        // NEW - pass error data for AI drill weak pattern aggregation
         errors: engine.errorLog,
         snippetContent: controls.snippet.content,
-        onResetEngine: engine.reset,
+        onResetEngine: engineResetRef.current,
         onSessionFinished: handleSessionFinished,
     });
 
@@ -246,6 +257,12 @@ export default function TypingSession() {
         focus.focusEditor();
     }, [focus, engine]);
 
+    const handleBackFromResults = useCallback(() => {
+        lifecycle.clearAutoAdvance();
+        engine.reset();
+        focus.enableEditorFocus();
+    }, [lifecycle, engine, focus]);
+
     const handleNextProblem = useCallback(() => {
         focus.enableEditorFocus();
         lifecycle.clearAutoAdvance();
@@ -285,6 +302,8 @@ export default function TypingSession() {
                                     onContentTypeChange={setContentType}
                                     selectedTopics={activeTopics}
                                     onToggleTopic={handleToggleTopic}
+                                    onSelectAllTopics={handleSelectAllTopics}
+                                    onClearAllTopics={handleClearAllTopics}
                                     surfaceStyle={storedSurfaceStyle}
                                     onSurfaceChange={persistSurfaceStyle}
                                     onStart={handleStart}
@@ -319,6 +338,7 @@ export default function TypingSession() {
                                                 isImmersive={isImmersive}
                                                 showChrome={showChrome}
                                                 prefersReducedMotion={prefersReducedMotion}
+                                                practiceTitle={controls.snippet.title}
                                                 currentProblem={controls.currentProblem}
                                                 problemCount={controls.problemOptions.length}
                                                 onNextProblem={handleNextProblem}
@@ -338,7 +358,11 @@ export default function TypingSession() {
                                                 content={controls.snippet.content}
                                                 cursorChar={engine.cursorIndex}
                                                 wrongChars={engine.wrongChars}
-                                                language={controls.language === "javascript" ? "javascript" : controls.language}
+                                                language={
+                                                    controls.language === "javascript"
+                                                        ? "javascript"
+                                                        : controls.language
+                                                }
                                                 caretErrorActive={engine.caretErrorActive}
                                                 onReady={focus.handleEditorReady}
                                                 fontSize={editorFontSize}
@@ -367,7 +391,6 @@ export default function TypingSession() {
                         </Box>
                     </motion.div>
                 ) : (
-                    /* Result Screen */
                     <ResultScreen
                         wpm={engine.metrics.adjustedWpm}
                         rawWpm={engine.metrics.rawWpm}
@@ -384,6 +407,7 @@ export default function TypingSession() {
                         autoAdvanceDeadline={lifecycle.autoAdvanceDeadline}
                         canAdvance={controls.problemOptions.length > 1}
                         onNext={handleNextProblem}
+                        onBack={handleBackFromResults}
                         prefersReducedMotion={prefersReducedMotion}
                         patternScore={engine.metrics.patternScore}
                         tokens={controls.snippet.tokens}

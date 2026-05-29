@@ -2,22 +2,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { Snippet } from "@/lib/snippets";
 
+const { mockPreferences } = vi.hoisted(() => ({
+    mockPreferences: {
+        countdownEnabled: false,
+        vimMode: false,
+        requireTabForIndent: false,
+        theme: "gruvbox" as const,
+        fontSize: 24,
+        caretWidth: 3,
+        surfaceStyle: "immersive" as const,
+        showLiveStatsDuringRun: true,
+        interfaceMode: "ide" as const,
+        syntaxHighlighting: "full" as const,
+        debugGapBuffer: false,
+    },
+}));
+
 // Mock the preferences module - usePreferences returns { preferences, setTheme, ... }
 vi.mock("@/lib/preferences", () => ({
     usePreferences: () => ({
-        preferences: {
-            countdownEnabled: false,
-            vimMode: false,
-            requireTabForIndent: false,
-            theme: "gruvbox",
-            fontSize: 24,
-            caretWidth: 3,
-            surfaceStyle: "immersive",
-            showLiveStatsDuringRun: true,
-            interfaceMode: "ide",
-            syntaxHighlighting: "full",
-            debugGapBuffer: false,
-        },
+        preferences: mockPreferences,
         setTheme: vi.fn(),
         setFontSize: vi.fn(),
         setCaretWidth: vi.fn(),
@@ -60,6 +64,7 @@ function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}): KeyboardEv
 describe("useTypingEngine", () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        mockPreferences.requireTabForIndent = false;
     });
 
     afterEach(() => {
@@ -346,6 +351,51 @@ describe("useTypingEngine", () => {
         expect(result.current.metrics.rawWpm).toBeCloseTo(1.4);
         expect(result.current.metrics.adjustedWpm).toBeCloseTo(1);
         expect(result.current.metrics.accuracy).toBeCloseTo(5 / 7);
+    });
+
+    // -------------------------------------------------------------------------
+    // Tab indent catch-up on new lines
+    // -------------------------------------------------------------------------
+
+    it("counts Tab indent catch-up on a new line as accurate", () => {
+        mockPreferences.requireTabForIndent = true;
+        const snippet = makeSnippet("def foo():\n    pass\n");
+        const { result } = renderHook(() => useTypingEngine({ snippet }));
+
+        act(() => {
+            result.current.handleKeyDown(fireKey("d"));
+            result.current.handleKeyDown(fireKey("e"));
+            result.current.handleKeyDown(fireKey("f"));
+            result.current.handleKeyDown(fireKey(" "));
+            result.current.handleKeyDown(fireKey("f"));
+            result.current.handleKeyDown(fireKey("o"));
+            result.current.handleKeyDown(fireKey("o"));
+            result.current.handleKeyDown(fireKey("("));
+            result.current.handleKeyDown(fireKey(")"));
+            result.current.handleKeyDown(fireKey(":"));
+            result.current.handleKeyDown(fireKey("Enter"));
+            result.current.handleKeyDown(fireKey("Tab"));
+            result.current.handleKeyDown(fireKey("p"));
+        });
+
+        expect(result.current.cursorIndex).toBe(16);
+        expect(result.current.wrongChars.size).toBe(0);
+        expect(result.current.correctKeystrokes).toBe(result.current.totalKeystrokes);
+    });
+
+    it("skips the full line indent in one Tab press", () => {
+        mockPreferences.requireTabForIndent = true;
+        const snippet = makeSnippet("a\n        b\n");
+        const { result } = renderHook(() => useTypingEngine({ snippet }));
+
+        act(() => {
+            result.current.handleKeyDown(fireKey("a"));
+            result.current.handleKeyDown(fireKey("Enter"));
+            result.current.handleKeyDown(fireKey("Tab"));
+        });
+
+        expect(result.current.cursorIndex).toBe(10);
+        expect(result.current.wrongChars.size).toBe(0);
     });
 
     // -------------------------------------------------------------------------

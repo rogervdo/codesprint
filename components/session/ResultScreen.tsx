@@ -41,6 +41,8 @@ export interface ResultScreenProps {
     canAdvance: boolean;
     /** Callback when next button is clicked */
     onNext: () => void;
+    /** Return to the practice home screen (idle controls) */
+    onBack?: () => void;
     /** Whether user prefers reduced motion */
     prefersReducedMotion: boolean;
     /** Pattern score (0-100) */
@@ -77,6 +79,7 @@ export function ResultScreen({
     autoAdvanceDeadline,
     canAdvance,
     onNext,
+    onBack,
     prefersReducedMotion,
     patternScore,
     tokens,
@@ -106,6 +109,7 @@ export function ResultScreen({
                     timeMs={timeMs}
                     errors={errors}
                     onNext={canAdvance ? onNext : undefined}
+                    onBack={onBack}
                     autoAdvanceDeadline={autoAdvanceDeadline}
                     snippetTitle={snippetTitle}
                     snippetId={snippetId}

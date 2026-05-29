@@ -27,6 +27,24 @@ function shouldFinishAtIndex(nextIndex: number, content: string) {
     return isEnd || isTrailingNewline;
 }
 
+function isAtLineStart(content: string, index: number): boolean {
+    if (index === 0) return true;
+    const previous = content[index - 1];
+    return previous === "\n" || previous === "\r";
+}
+
+/** Spaces/tabs at the beginning of a line (after Enter or at file start). */
+function getLeadingIndentLength(content: string, index: number): number {
+    if (!isAtLineStart(content, index)) return 0;
+    let target = index;
+    while (target < content.length) {
+        const ch = content[target];
+        if (ch !== " " && ch !== "\t") break;
+        target += 1;
+    }
+    return target - index;
+}
+
 type UseTypingEngineProps = {
     snippet: Snippet;
     onFinish?: () => void;
@@ -275,28 +293,34 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
                 }
             }
 
-            // Tab counts as a keystroke? Usually yes.
-            setTotalKeystrokes(prev => prev + 1);
-
             const startIndex = cursorIndexRef.current;
             const content = snippetRef.current.content;
             if (startIndex >= content.length) return;
 
-            // 1. Auto-advance check
-            const auto = autoAdvanceIndentationIfAllowed(startIndex);
-            if (auto.advanced > 0) {
-                const advancedIndex = auto.nextIndex;
+            const applyIndentCatchUp = (advanced: number, nextIndex: number) => {
+                cursorIndexRef.current = nextIndex;
+                setCursorIndex(nextIndex);
+                setTotalKeystrokes((prev) => prev + 1);
+                setCorrectKeystrokes((prev) => prev + 1);
+                setTotalTypedChars((prev) => prev + advanced);
+                for (let i = startIndex; i < nextIndex; i++) wrongCharsRef.current.delete(i);
+            };
 
-                // Apply updates for auto-advance
-                cursorIndexRef.current = advancedIndex;
-                setCursorIndex(advancedIndex);
-                setTotalTypedChars(prev => prev + auto.advanced);
-                for (let i = startIndex; i < advancedIndex; i++) wrongCharsRef.current.delete(i);
-
+            // 1. Tab on a new line: skip all leading indent without hurting accuracy
+            const lineIndent = getLeadingIndentLength(content, startIndex);
+            if (lineIndent > 0) {
+                applyIndentCatchUp(lineIndent, startIndex + lineIndent);
                 return;
             }
 
-            // 2. Manual Tab (spaces)
+            // 2. Auto-advance when Tab-for-indent is not required
+            const auto = autoAdvanceIndentationIfAllowed(startIndex);
+            if (auto.advanced > 0) {
+                applyIndentCatchUp(auto.advanced, auto.nextIndex);
+                return;
+            }
+
+            // 3. Mid-line Tab through up to INDENT_WIDTH spaces
             let advanced = 0;
             while (
                 advanced < INDENT_WIDTH &&
@@ -307,24 +331,27 @@ export function useTypingEngine({ snippet, onFinish }: UseTypingEngineProps) {
             }
 
             if (advanced > 0) {
-                cursorIndexRef.current = startIndex + advanced;
-                setCursorIndex(cursorIndexRef.current);
-                setTotalTypedChars(prev => prev + advanced);
-                // Manual tab is a correct action
-                setCorrectKeystrokes(prev => prev + 1);
-                for (let i = 0; i < advanced; i++) wrongCharsRef.current.delete(startIndex + i);
+                applyIndentCatchUp(advanced, startIndex + advanced);
                 return;
             }
 
-            // 3. Manual Tab (literal tab character)
-            const expected = content[startIndex];
-            if (expected === "\t") {
-                cursorIndexRef.current = startIndex + 1;
-                setCursorIndex(cursorIndexRef.current);
-                setTotalTypedChars(prev => prev + 1);
-                setCorrectKeystrokes(prev => prev + 1);
+            // 4. Literal tab character in snippet
+            if (content[startIndex] === "\t") {
+                const nextIndex = startIndex + 1;
+                cursorIndexRef.current = nextIndex;
+                setCursorIndex(nextIndex);
+                setTotalKeystrokes((prev) => prev + 1);
+                setCorrectKeystrokes((prev) => prev + 1);
+                setTotalTypedChars((prev) => prev + 1);
                 wrongCharsRef.current.delete(startIndex);
+                return;
             }
+
+            // 5. Tab at line start with nothing to skip (blank line) — ignore, no penalty
+            if (isAtLineStart(content, startIndex)) {
+                return;
+            }
+
             return;
         }
 

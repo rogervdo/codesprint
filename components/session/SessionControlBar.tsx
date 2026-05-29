@@ -5,13 +5,20 @@ import {
     Flex,
     Text,
     Badge,
+    chakra,
     TooltipRoot,
     TooltipTrigger,
     TooltipPositioner,
     TooltipContent,
 } from "@chakra-ui/react";
+import type { IconProps as ChakraIconProps } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "framer-motion";
-import { getPillButtonStyles, getStartButtonStyles, SESSION_CSS_VARS } from "@/lib/session-styles";
+import {
+    getIconPillButtonStyles,
+    getPillButtonStyles,
+    getStartButtonStyles,
+    SESSION_CSS_VARS,
+} from "@/lib/session-styles";
 import { getControlsMotion, getStartButtonMotion } from "@/lib/motion-config";
 import type { SupportedLanguage } from "@/lib/snippets";
 import type { Phase } from "@/hooks/useFocusManagement";
@@ -37,6 +44,8 @@ export interface SessionControlBarProps {
     onContentTypeChange: (type: SnippetType) => void;
     selectedTopics: CatalogTopic[];
     onToggleTopic: (topic: CatalogTopic) => void;
+    onSelectAllTopics: () => void;
+    onClearAllTopics: () => void;
     surfaceStyle: SurfaceStyle;
     onSurfaceChange: (style: SurfaceStyle) => void;
     onStart: () => void;
@@ -59,6 +68,45 @@ const SURFACE_OPTIONS: Array<{ value: SurfaceStyle; label: string }> = [
     { value: "immersive", label: "Immersive" },
 ];
 
+function SelectAllTopicsIcon(props: ChakraIconProps) {
+    return (
+        <chakra.svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+            {...props}
+        >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M8 12h8" />
+            <path d="M12 8v8" />
+        </chakra.svg>
+    );
+}
+
+function ClearAllTopicsIcon(props: ChakraIconProps) {
+    return (
+        <chakra.svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+            {...props}
+        >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M8 12h8" />
+        </chakra.svg>
+    );
+}
+
 export function SessionControlBar({
     language,
     onLanguageChange,
@@ -66,6 +114,8 @@ export function SessionControlBar({
     onContentTypeChange,
     selectedTopics,
     onToggleTopic,
+    onSelectAllTopics,
+    onClearAllTopics,
     surfaceStyle,
     onSurfaceChange,
     onStart,
@@ -92,6 +142,9 @@ export function SessionControlBar({
     const rateLimit = checkRateLimit(preferences.aiMaxDrillsPerDay);
     const topicOptions = getTopicsForType(contentType);
     const topicLabels = getTopicLabelsForType(contentType);
+    const iconPillStyles = getIconPillButtonStyles(isTerminalMode);
+    const allTopicsSelected = topicOptions.every((topic) => selectedTopics.includes(topic));
+    const onlyOneTopicSelected = selectedTopics.length === 1;
 
     return (
         <motion.div
@@ -155,9 +208,63 @@ export function SessionControlBar({
             </Flex>
 
             <Flex gap={2} flexWrap="wrap" align="flex-start">
-                <Text fontSize="xs" color="var(--text-subtle)" fontWeight={600} minW="3.5rem" pt={1}>
-                    Topics
-                </Text>
+                <Flex align="center" gap={1} minW="3.5rem" pt={1}>
+                    <Text fontSize="xs" color="var(--text-subtle)" fontWeight={600}>
+                        Topics
+                    </Text>
+                    <TooltipRoot>
+                        <TooltipTrigger asChild>
+                            <Button
+                                aria-label="Select all topics"
+                                onClick={onSelectAllTopics}
+                                disabled={disabled || allTopicsSelected}
+                                {...iconPillStyles}
+                                minW="1.75rem"
+                                h="1.75rem"
+                            >
+                                <SelectAllTopicsIcon boxSize={3.5} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipPositioner>
+                            <TooltipContent
+                                bg="var(--surface)"
+                                color="var(--text)"
+                                border="1px solid var(--border)"
+                                fontSize="xs"
+                                px={2}
+                                py={1}
+                            >
+                                Select all topics
+                            </TooltipContent>
+                        </TooltipPositioner>
+                    </TooltipRoot>
+                    <TooltipRoot>
+                        <TooltipTrigger asChild>
+                            <Button
+                                aria-label="Clear all topics"
+                                onClick={onClearAllTopics}
+                                disabled={disabled || onlyOneTopicSelected}
+                                {...iconPillStyles}
+                                minW="1.75rem"
+                                h="1.75rem"
+                            >
+                                <ClearAllTopicsIcon boxSize={3.5} />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipPositioner>
+                            <TooltipContent
+                                bg="var(--surface)"
+                                color="var(--text)"
+                                border="1px solid var(--border)"
+                                fontSize="xs"
+                                px={2}
+                                py={1}
+                            >
+                                Clear topics (keeps one active)
+                            </TooltipContent>
+                        </TooltipPositioner>
+                    </TooltipRoot>
+                </Flex>
                 <Flex gap={2} flexWrap="wrap" flex={1}>
                     {topicOptions.map((topic) => (
                         <Button

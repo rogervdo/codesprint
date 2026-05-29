@@ -35,6 +35,8 @@ function ShuffleIcon(props: ChakraIconProps) {
 }
 
 export interface SessionTopBarProps extends ProgressIndicatorProps {
+    /** Snippet or problem title shown while practicing */
+    practiceTitle: string;
     /** Current problem being practiced (null if none) */
     currentProblem: Problem | null;
     /** Total number of problems available */
@@ -56,6 +58,7 @@ export function SessionTopBar({
     isImmersive,
     showChrome,
     prefersReducedMotion,
+    practiceTitle,
     currentProblem,
     problemCount,
     onNextProblem,
@@ -65,22 +68,32 @@ export function SessionTopBar({
     const nextProblemButtonStyles = getNextProblemButtonStyles(isTerminalMode);
     const randomizeButtonStyles = getRandomizeButtonStyles(isTerminalMode);
 
-    // Problem summary
+    const hasPracticeTitle = practiceTitle.length > 0;
+
     const problemSummary =
-        problemCount > 0 ? (
-            <Flex direction="column" gap={1} minW={0}>
-                <Text fontSize="sm" fontWeight={600} color="var(--text)" whiteSpace="nowrap">
-                    {problemCount} {problemCount === 1 ? "problem" : "problems"}
-                </Text>
-                <Text
-                    fontSize="xs"
-                    color="var(--text-subtle)"
-                    whiteSpace="nowrap"
-                    textOverflow="ellipsis"
-                    overflow="hidden"
-                >
-                    Now practicing: {currentProblem ? currentProblem.title : "Random snippet"}
-                </Text>
+        hasPracticeTitle || problemCount > 0 ? (
+            <Flex direction="column" gap={1} minW={0} flex="1 1 auto">
+                {hasPracticeTitle && (
+                    <Text
+                        fontSize="sm"
+                        fontWeight={600}
+                        color="var(--text)"
+                        whiteSpace="nowrap"
+                        textOverflow="ellipsis"
+                        overflow="hidden"
+                        title={practiceTitle}
+                    >
+                        {practiceTitle}
+                    </Text>
+                )}
+                {showChrome && problemCount > 0 && (
+                    <Text fontSize="xs" color="var(--text-subtle)" whiteSpace="nowrap">
+                        {problemCount} {problemCount === 1 ? "problem" : "problems"}
+                        {currentProblem && currentProblem.title !== practiceTitle
+                            ? ` · ${currentProblem.title}`
+                            : ""}
+                    </Text>
+                )}
             </Flex>
         ) : (
             <Text fontSize="sm" fontWeight={600} color="var(--text)">
@@ -139,7 +152,6 @@ export function SessionTopBar({
             </TooltipRoot>
         ) : null;
 
-    // Check if we have content to show
     const progressIndicator = (
         <ProgressIndicator
             progress={progress}
@@ -150,7 +162,11 @@ export function SessionTopBar({
         />
     );
 
-    const hasMeta = Boolean(showChrome && (progressIndicator || problemSummary));
+    const hasMeta = Boolean(
+        hasPracticeTitle ||
+            (showChrome && progressIndicator) ||
+            (showChrome && problemCount > 0)
+    );
     const hasActions = Boolean(nextProblemButton || randomizeButton);
 
     if (!hasMeta && !hasActions) return null;
